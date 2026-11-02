@@ -414,17 +414,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Assistente conectado ao serviço de IA configurado no servidor */}
-      {isSupabaseConfigured && <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-[#0D1826] to-[#0A2218] border border-brand-500/30 p-6 shadow-xl text-white">
+      {isSupabaseConfigured && <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-200 p-6 shadow-card text-slate-900">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 text-xs font-semibold">
-              <Sparkles className="w-3.5 h-3.5 text-brand-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-700 border border-brand-500/30 text-xs font-semibold">
+              <Sparkles className="w-3.5 h-3.5 text-brand-600 animate-pulse" />
               <span>NEXUS AI — Orquestrador Operacional</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
               Como posso acelerar sua empresa agora?
             </h2>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Consulte seus dados e solicite ações nos módulos conectados. Alterações que exigem confirmação continuam sob seu controle.
             </p>
 
@@ -434,7 +434,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   key={idx}
                   onClick={() => onNavigate('ai-assistant', prompt)}
-                  className="text-xs bg-white/10 hover:bg-brand-500/30 hover:border-brand-400 border border-white/10 px-3 py-1.5 rounded-xl transition-all text-slate-200 text-left flex items-center gap-1.5"
+                  className="text-xs bg-slate-50 hover:bg-brand-500/20 hover:border-brand-600 border border-slate-200 px-3 py-1.5 rounded-xl transition-all text-slate-700 text-left flex items-center gap-1.5"
                 >
                   <span>"{prompt}"</span>
                   <ArrowRight className="w-3 h-3 text-brand-400" />

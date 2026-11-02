@@ -43,20 +43,20 @@ export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4 relative overflow-hidden">
       <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-lg bg-[#0F1622] border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
+      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
         <button
           onClick={onNavigateToLogin}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white mb-6 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-brand-700 mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Voltar para o login</span>
         </button>
 
         <div className="space-y-1 mb-6">
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
             Criar conta no NEXUS AI
           </h2>
           <p className="text-xs text-slate-400">

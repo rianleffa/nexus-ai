@@ -13,8 +13,14 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('nexus_theme');
+    const paletteVersion = localStorage.getItem('nexus_theme_palette');
+    if (paletteVersion !== 'light-green-v1') {
+      localStorage.setItem('nexus_theme_palette', 'light-green-v1');
+      localStorage.setItem('nexus_theme', 'light');
+      return 'light';
+    }
     if (saved === 'light' || saved === 'dark') return saved;
-    return 'dark'; // Dark mode default for premium enterprise tech feel
+    return 'light';
   });
 
   useEffect(() => {
@@ -25,6 +31,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.classList.remove('dark');
     }
     localStorage.setItem('nexus_theme', theme);
+    localStorage.setItem('nexus_theme_palette', 'light-green-v1');
   }, [theme]);
 
   const toggleTheme = () => {

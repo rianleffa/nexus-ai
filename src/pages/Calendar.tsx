@@ -353,7 +353,7 @@ export const Calendar: React.FC<CalendarProps> = ({ onNavigate }) => {
                     <span
                       className={`text-xs font-bold ${
                         isToday
-                          ? 'w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center shadow-xs'
+                          ? 'w-6 h-6 rounded-full bg-brand-500 text-slate-900 flex items-center justify-center shadow-xs'
                           : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >

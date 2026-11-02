@@ -70,18 +70,18 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4 relative overflow-hidden">
       {/* Background Ambient Glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-72 h-72 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md bg-[#0F1622] border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
+      <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
         {/* Brand Header */}
         <div className="text-center space-y-2 mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white font-black text-2xl shadow-glow mb-2">
             N
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white flex items-center justify-center gap-1.5">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-center justify-center gap-1.5">
             <span>NEXUS</span>
             <span className="text-brand-400">AI</span>
           </h1>
@@ -91,7 +91,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
         </div>
 
         {(oauthError || authError) && (
-          <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm text-rose-200" role="alert" aria-live="polite">
+          <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm text-rose-800" role="alert" aria-live="polite">
             {oauthError || authError}
           </div>
         )}
@@ -118,11 +118,11 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
         </div>}
 
         <div className="relative flex items-center justify-center mb-5">
-          <div className="border-t border-slate-800 w-full" />
-          <span className="bg-[#0F1622] px-3 text-[10px] text-slate-500 uppercase tracking-wider">
+          <div className="border-t border-slate-200 w-full" />
+          <span className="bg-white px-3 text-[10px] text-slate-500 uppercase tracking-wider">
             Ou acesse com credenciais
           </span>
-          <div className="border-t border-slate-800 w-full" />
+          <div className="border-t border-slate-200 w-full" />
         </div>
 
         {/* Login Form */}
@@ -138,7 +138,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-slate-300">Senha</label>
+              <label className="text-xs font-medium text-slate-600">Senha</label>
             </div>
             <Input
               type="password"
@@ -167,7 +167,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
             onClick={handleGoogleLogin}
             isLoading={isGoogleLoading}
             disabled={isLoading}
-            className="w-full border-slate-800 text-slate-300 hover:bg-slate-900"
+            className="w-full border-slate-200 text-slate-600 hover:bg-slate-100"
           >
             <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
               <path
@@ -192,7 +192,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
         </form>
 
         {/* Bottom Links */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+        <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-400">
           <div>
             Não tem uma conta?{' '}
             <button
@@ -206,7 +206,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
           {onNavigateToLanding && (
             <button
               onClick={onNavigateToLanding}
-              className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors"
+              className="flex items-center gap-1 text-slate-600 hover:text-brand-700 transition-colors"
             >
               <Globe className="w-3.5 h-3.5" />
               <span>Ver Landing Page</span>

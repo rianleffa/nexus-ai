@@ -143,7 +143,7 @@ export const Reports: React.FC = () => {
               onClick={() => setPeriod(item.id as any)}
               className={`px-3 py-1.5 rounded-xl font-semibold transition-all shrink-0 ${
                 period === item.id
-                  ? 'bg-brand-500 text-white shadow-xs'
+                  ? 'bg-brand-500 text-slate-900 shadow-xs'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
               }`}
             >

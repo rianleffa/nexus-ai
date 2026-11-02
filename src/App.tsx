@@ -53,7 +53,7 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700">
         <div className="flex items-center gap-3 text-sm" role="status" aria-live="polite">
           <span className="w-4 h-4 rounded-full border-2 border-slate-600 border-t-brand-400 animate-spin" />
           Verificando sessão...

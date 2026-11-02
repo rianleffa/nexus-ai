@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .select('*')
       .eq('user_id', authUser.id)
       .maybeSingle();
-    if (profileError || !profile?.company_id) {
+    if (profileError || !profile) {
       console.error('[Auth] Perfil da empresa não encontrado para a sessão atual.', profileError);
       setUser(null);
       setCompany(null);
@@ -71,11 +71,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
-    const { data: companyRow, error: companyError } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', profile.company_id)
-      .maybeSingle();
+    const companyQuery = supabase.from('companies').select('*');
+    // Owner-based companies must be scoped to the authenticated user.
+    const { data: companyRow, error: companyError } = await (profile.company_id
+      ? companyQuery.eq('id', profile.company_id)
+      : companyQuery.eq('user_id', authUser.id)
+    ).maybeSingle();
     if (companyError || !companyRow) {
       console.error('[Auth] Empresa da sessão atual não encontrada.', companyError);
       setUser(null);
@@ -102,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     const loggedUser: User = {
       id: authUser.id,
-      company_id: profile.company_id,
+      company_id: companyRow.id,
       name: displayName,
       full_name: profile.full_name || displayName,
       display_name: displayName,

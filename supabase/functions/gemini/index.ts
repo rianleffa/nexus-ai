@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import { validDate } from './validation.mjs';
 
 const allowedOrigins = new Set([
   'https://nexus-ai-sigma-sooty.vercel.app',
@@ -21,13 +22,13 @@ const toolNames = [
   'get_clients', 'get_client', 'get_projects', 'get_tasks', 'get_calendar_events',
   'get_financial_transactions', 'get_dashboard_summary', 'get_my_day',
   'get_clients_needing_attention', 'get_documents',
-  'create_client', 'update_client', 'create_project', 'create_task',
+  'create_client', 'update_client', 'create_project', 'update_project', 'create_task',
   'update_task', 'create_calendar_event', 'create_financial_transaction', 'complete_task',
   'reschedule_calendar_event', 'cancel_calendar_event', 'update_calendar_event',
 ] as const;
 type ToolName = typeof toolNames[number];
 const writeTools = new Set<ToolName>([
-  'create_client', 'update_client', 'create_project', 'create_task',
+  'create_client', 'update_client', 'create_project', 'update_project', 'create_task',
   'update_task', 'create_calendar_event', 'create_financial_transaction',
   'complete_task', 'reschedule_calendar_event', 'cancel_calendar_event', 'update_calendar_event',
 ]);
@@ -46,6 +47,7 @@ const declarations = [
   { name: 'create_client', description: 'Cadastra um cliente após confirmação do usuário.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, company_name: { type: 'STRING' }, email: { type: 'STRING' }, phone: { type: 'STRING' }, document: { type: 'STRING' }, notes: { type: 'STRING' } }, required: ['name'] } },
   { name: 'update_client', description: 'Atualiza os dados de um cliente existente após confirmação.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nome, e-mail ou UUID do cliente.' }, name: { type: 'STRING' }, company_name: { type: 'STRING' }, email: { type: 'STRING' }, phone: { type: 'STRING' }, document: { type: 'STRING' }, notes: { type: 'STRING' }, status: { type: 'STRING', enum: ['ativo', 'inativo', 'prospect'] } }, required: ['query'] } },
   { name: 'create_project', description: 'Cria um projeto após confirmação.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, client_name: { type: 'STRING' }, description: { type: 'STRING' }, budget: { type: 'NUMBER' }, due_date: { type: 'STRING' } }, required: ['name'] } },
+  { name: 'update_project', description: 'Atualiza um projeto existente identificado pelo nome ou UUID após confirmação.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nome ou UUID do projeto.' }, name: { type: 'STRING' }, client_name: { type: 'STRING' }, description: { type: 'STRING' }, budget: { type: 'NUMBER' }, progress: { type: 'INTEGER' }, status: { type: 'STRING', enum: ['planejamento', 'em_andamento', 'pausado', 'concluido'] }, due_date: { type: 'STRING' } }, required: ['query'] } },
   { name: 'create_task', description: 'Cria uma tarefa após confirmação.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, description: { type: 'STRING' }, priority: { type: 'STRING', enum: ['baixa', 'media', 'alta', 'urgente'] }, due_date: { type: 'STRING' }, client_name: { type: 'STRING' }, project_name: { type: 'STRING' } }, required: ['title', 'due_date'] } },
   { name: 'update_task', description: 'Atualiza uma tarefa existente identificada por título ou UUID após confirmação.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Título ou UUID da tarefa.' }, title: { type: 'STRING' }, description: { type: 'STRING' }, priority: { type: 'STRING', enum: ['baixa', 'media', 'alta', 'urgente'] }, status: { type: 'STRING', enum: ['backlog', 'a_fazer', 'em_andamento', 'concluido'] }, due_date: { type: 'STRING', description: 'Data no formato YYYY-MM-DD.' }, client_name: { type: 'STRING' }, project_name: { type: 'STRING' } }, required: ['query'] } },
   { name: 'create_calendar_event', description: 'Agenda compromisso após confirmação.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, description: { type: 'STRING' }, event_type: { type: 'STRING', enum: ['reuniao', 'ligacao', 'tarefa', 'compromisso', 'outro'] }, event_date: { type: 'STRING' }, start_time: { type: 'STRING' }, duration_minutes: { type: 'INTEGER' }, client_name: { type: 'STRING' }, location: { type: 'STRING' } }, required: ['title', 'event_date', 'start_time'] } },
@@ -250,6 +252,31 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
       const result = await db.from(table).insert({ company_id: companyId, name, client_id: client?.id || null, client_name: client?.name || clean(args.client_name, 255) || 'Projeto interno', description: clean(args.description, 2000), budget: Math.max(0, Number(args.budget) || 0), due_date: validDate(args.due_date) ? args.due_date : null, start_date: saoPauloDate(), progress: 0, status: 'em_andamento' }).select('id,name,client_name,budget,due_date,status').single();
       if (result.error) throw result.error; data = result.data; break;
     }
+    case 'update_project': {
+      table = 'projects'; const term = clean(args.query, 255); if (!term) fail('Informe o nome ou UUID do projeto.');
+      let find = db.from(table).select('id,name').eq('company_id', companyId).limit(2);
+      find = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(term) ? find.eq('id', term) : find.ilike('name', `%${term.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+      const found = await find; if (found.error) throw found.error;
+      if (!found.data?.length) fail('Projeto não encontrado.');
+      if (found.data.length > 1) fail('Encontrei projetos com nomes parecidos. Informe um nome mais específico.');
+      const updates: Record<string, unknown> = {};
+      if (args.name !== undefined) { const name = clean(args.name, 255); if (!name) fail('O nome do projeto não pode ficar vazio.'); updates.name = name; }
+      if (args.description !== undefined) updates.description = clean(args.description, 2000);
+      if (args.client_name !== undefined) {
+        const clientName = clean(args.client_name, 255);
+        const client = clientName ? await findClientId(db, companyId, clientName) : null;
+        if (clientName && !client) fail(`Não encontrei o cliente “${clientName}”.`);
+        updates.client_id = client?.id || null;
+        updates.client_name = client?.name || null;
+      }
+      if (args.budget !== undefined) { const budget = Number(args.budget); if (!Number.isFinite(budget) || budget < 0 || budget > 1_000_000_000) fail('Informe um orçamento válido.'); updates.budget = budget; }
+      if (args.progress !== undefined) { const progress = Number(args.progress); if (!Number.isInteger(progress) || progress < 0 || progress > 100) fail('O progresso deve ser um número inteiro entre 0 e 100.'); updates.progress = progress; }
+      if (args.status !== undefined) { if (!['planejamento', 'em_andamento', 'pausado', 'concluido'].includes(String(args.status))) fail('Informe um status válido para o projeto.'); updates.status = args.status; }
+      if (args.due_date !== undefined) { if (args.due_date !== null && !validDate(args.due_date)) fail('Informe o prazo no formato YYYY-MM-DD.'); updates.due_date = args.due_date || null; }
+      if (!Object.keys(updates).length) fail('Informe ao menos um campo para atualizar.');
+      const result = await db.from(table).update(updates).eq('company_id', companyId).eq('id', found.data[0].id).select('id,name,client_name,description,budget,progress,status,due_date').single();
+      if (result.error) throw result.error; data = result.data; break;
+    }
     case 'create_task': {
       table = 'tasks'; const title = clean(args.title, 255); if (!title || !validDate(args.due_date)) fail('Informe o título e um prazo válido (YYYY-MM-DD).');
       const client = args.client_name ? await findClientId(db, companyId, args.client_name) : null;
@@ -338,13 +365,14 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
     case 'create_financial_transaction': {
       table = 'financial_transactions'; const amount = Number(args.amount); if (!['receita','despesa'].includes(String(args.type)) || !Number.isFinite(amount) || amount <= 0 || amount > 1_000_000_000 || !clean(args.description, 255) || !validDate(args.due_date)) fail('Informe tipo, descrição, valor positivo e vencimento válido.');
       const client = args.client_name ? await findClientId(db, companyId, args.client_name) : null;
+      if (args.client_name && !client) fail(`Não encontrei o cliente “${clean(args.client_name, 255)}”.`);
       const result = await db.from(table).insert({ company_id: companyId, client_id: client?.id || null, type: args.type, description: clean(args.description, 255), amount, category: clean(args.category, 100) || 'Outros', due_date: args.due_date, status: ['pago','pendente','atrasado'].includes(String(args.status)) ? args.status : 'pendente', payment_date: args.status === 'pago' ? args.due_date : null, payment_method: 'pix' }).select('id,type,description,amount,category,due_date,status').single();
       if (result.error) throw result.error; data = result.data; break;
     }
   }
   const changed = writeTools.has(tool);
   const entity = tool.includes('client') ? 'client' : tool.includes('project') ? 'project' : tool.includes('task') ? 'task' : tool.includes('calendar') ? 'calendar_event' : tool.includes('financial') ? 'financial_transaction' : undefined;
-  const action = ['update_client', 'update_task', 'complete_task', 'reschedule_calendar_event', 'cancel_calendar_event', 'update_calendar_event'].includes(tool)
+  const action = ['update_client', 'update_project', 'update_task', 'complete_task', 'reschedule_calendar_event', 'cancel_calendar_event', 'update_calendar_event'].includes(tool)
     ? 'updated'
     : changed ? 'created' : undefined;
   return {
@@ -358,11 +386,6 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
   };
 }
 
-function validDate(value: unknown) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
 function saoPauloDate() {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
@@ -580,6 +603,8 @@ function confirmationMessage(tool: ToolName, args: Record<string, any>) {
           ? `atualização da tarefa “${clean(args.query, 255)}”${args.title ? `: título ${clean(args.title, 255)}` : ''}${args.status ? `, status ${clean(args.status, 30)}` : ''}${args.priority ? `, prioridade ${clean(args.priority, 30)}` : ''}${args.due_date ? `, prazo ${clean(args.due_date, 10)}` : ''}`
         : tool === 'create_project'
           ? `projeto “${clean(args.name, 255)}”`
+          : tool === 'update_project'
+            ? `atualização do projeto “${clean(args.query, 255)}”${args.status ? `, status ${clean(args.status, 30)}` : ''}${args.progress !== undefined ? `, progresso ${Number(args.progress)}%` : ''}${args.due_date ? `, prazo ${clean(args.due_date, 10)}` : ''}`
     : tool === 'complete_task'
       ? `conclusão da tarefa “${clean(args.task_id_or_title, 255)}”`
       : tool === 'reschedule_calendar_event'

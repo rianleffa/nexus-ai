@@ -1,5 +1,5 @@
 import type { AIToolExecutionResult, ChatMessage } from '../../types';
-import { supabase, isSupabaseConfigured } from '../supabase';
+import { supabase, isSupabaseConfigured, supabaseProjectUrl } from '../supabase';
 
 type AssistantResponse = {
   success: boolean;
@@ -24,6 +24,9 @@ async function invokeAssistant(body: Record<string, unknown>): Promise<Assistant
     const context = (error as any).context;
     const details = context instanceof Response ? await context.clone().json().catch(() => null) : context;
     const serverMessage = details?.body?.error || details?.error || error.message;
+    if (/failed to send a request to the edge function|failed to fetch|fetch failed/i.test(error.message)) {
+      throw new Error(`Não foi possível alcançar a função Gemini em ${supabaseProjectUrl}/functions/v1/gemini. Verifique se ela está implantada nesse projeto Supabase e se a URL pública do app aponta para o projeto correto.`);
+    }
     throw new Error(serverMessage || 'Não foi possível conectar ao assistente.');
   }
   if (!data?.success) throw new Error(data?.error || 'O assistente não conseguiu concluir a solicitação.');
@@ -42,11 +45,12 @@ export class AIService {
       message: text,
       history: priorHistory.slice(-12).map(({ sender, content }) => ({ sender, content })),
     });
+    if (!response.text) throw new Error('O Gemini retornou uma resposta vazia. Tente novamente.');
     return {
       id: `ai-${crypto.randomUUID()}`,
       sender: 'assistant',
       timestamp: timestamp(),
-      content: response.text || 'Não recebi uma resposta utilizável. Tente novamente.',
+      content: response.text,
       pendingConfirmation: response.pendingConfirmation,
       toolCall: response.toolCall ? {
         ...response.toolCall,
@@ -60,7 +64,8 @@ export class AIService {
 
   public static async executeConfirmed(confirmationToken: string): Promise<{ message: string; result?: AIToolExecutionResult }> {
     const response = await invokeAssistant({ action: 'confirm', confirmationToken });
-    return { message: response.text || 'A operação foi concluída.', result: response.toolCall?.result };
+    if (!response.text) throw new Error('O servidor confirmou a ação, mas não retornou a mensagem de confirmação. Consulte os registros antes de tentar novamente.');
+    return { message: response.text, result: response.toolCall?.result };
   }
 
   public static async cancelConfirmation(confirmationToken: string): Promise<void> {

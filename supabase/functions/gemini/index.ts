@@ -450,9 +450,10 @@ Deno.serve(async (req: Request) => {
       const calls = parts.map((part: any) => part.functionCall).filter(Boolean);
       if (!calls.length) {
         const text = parts.map((part: any) => part.text || '').join('').trim();
+        if (!text) return json({ success: false, error: 'O Gemini não retornou uma resposta utilizável. Tente novamente.' }, 502, origin);
         return json({
           success: true,
-          text: text || (readResults.length ? readResults.map(({ tool, result }) => describe(tool, result)).join('\n\n') : 'Não consegui gerar uma resposta. Tente novamente.'),
+          text,
           ...(readResults.length ? { toolCall: { toolName: readResults.at(-1)!.tool, parameters: readResults.at(-1)!.parameters, result: readResults.at(-1)!.result, status: 'success' } } : {}),
         }, 200, origin);
       }
@@ -485,11 +486,11 @@ Deno.serve(async (req: Request) => {
       contents.push(candidate.content, { role: 'user', parts: functionResponses });
       response = await geminiCall(apiKey, contents, system, signal);
     }
-    const fallback = readResults.map(({ tool, result }) => describe(tool, result)).join('\n\n');
-    return json({ success: true, text: fallback || 'A consulta foi limitada por segurança. Faça uma pergunta mais específica.' }, 200, origin);
+    return json({ success: false, error: 'A consulta excedeu o limite de etapas do Gemini. Faça uma pergunta mais específica.' }, 502, origin);
   } catch (error: any) {
-    const status = Number(error?.status) || (error?.name === 'AbortError' ? 504 : 400);
-    const message = error?.name === 'AbortError' ? 'O Gemini demorou mais que o esperado. Tente novamente.' : error?.message || 'Falha ao processar a solicitação.';
+    const timedOut = error?.name === 'AbortError' || error?.name === 'TimeoutError';
+    const status = Number(error?.status) || (timedOut ? 504 : 400);
+    const message = timedOut ? 'O Gemini demorou mais que o esperado. Tente novamente.' : error?.message || 'Falha ao processar a solicitação.';
     console.error('[gemini-edge]', String(message).replace(/(?:AIza|AQ\.)[A-Za-z0-9_.-]{30,}/g, '[REDACTED]'));
     return json({ success: false, error: message, errorType: status === 429 ? 'RATE_LIMIT' : 'API_ERROR' }, status, origin);
   }

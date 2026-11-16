@@ -45,7 +45,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       content:
         `Olá, **${user?.name.split(' ')[0] || 'bem-vindo(a)'}**! Sou o gestor virtual do **NEXUS AI** para **${company?.name || 'sua empresa'}**.\n\n` +
-        `Posso responder perguntas e solicitar ações nos módulos quando a integração de IA no servidor estiver disponível. Ações sensíveis aguardam sua confirmação.`,
+        `Posso consultar informações autorizadas da empresa e preparar ações nos módulos. Você confirma antes de qualquer alteração ser gravada.`,
     },
   ]);
 

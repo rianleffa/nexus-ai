@@ -371,8 +371,19 @@ async function geminiCall(apiKey: string, contents: unknown[], systemInstruction
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const status = response.status === 429 ? 429 : response.status;
-    throw Object.assign(new Error(status === 429 ? 'Limite temporário do Gemini atingido. Aguarde e tente novamente.' : status === 400 || status === 403 ? 'O Gemini rejeitou a chamada. Confira a chave, o projeto e o acesso ao modelo.' : `O serviço Gemini respondeu com erro (${status}).`), { status });
+    const status = response.status;
+    const providerMessage = typeof payload?.error?.message === 'string'
+      ? payload.error.message
+        .replace(/(?:AIza|AQ\.)[A-Za-z0-9_.-]{20,}/g, '[credencial omitida]')
+        .replace(/[\r\n\t]+/g, ' ')
+        .slice(0, 400)
+      : '';
+    const message = status === 429
+      ? 'Limite temporário do Gemini atingido. Aguarde e tente novamente.'
+      : status === 400 || status === 401 || status === 403 || status === 404
+        ? `O Gemini recusou a solicitação (HTTP ${status})${providerMessage ? `: ${providerMessage}` : '.'}`
+        : `O serviço Gemini respondeu com erro (${status}).`;
+    throw Object.assign(new Error(message), { status, providerStatus: payload?.error?.status });
   }
   return payload;
 }

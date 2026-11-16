@@ -22,13 +22,13 @@ const toolNames = [
   'get_financial_transactions', 'get_dashboard_summary', 'get_my_day',
   'get_clients_needing_attention', 'get_documents',
   'create_client', 'update_client', 'create_project', 'create_task',
-  'create_calendar_event', 'create_financial_transaction', 'complete_task',
+  'update_task', 'create_calendar_event', 'create_financial_transaction', 'complete_task',
   'reschedule_calendar_event', 'cancel_calendar_event', 'update_calendar_event',
 ] as const;
 type ToolName = typeof toolNames[number];
 const writeTools = new Set<ToolName>([
   'create_client', 'update_client', 'create_project', 'create_task',
-  'create_calendar_event', 'create_financial_transaction',
+  'update_task', 'create_calendar_event', 'create_financial_transaction',
   'complete_task', 'reschedule_calendar_event', 'cancel_calendar_event', 'update_calendar_event',
 ]);
 
@@ -47,6 +47,7 @@ const declarations = [
   { name: 'update_client', description: 'Atualiza os dados de um cliente existente após confirmação.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nome, e-mail ou UUID do cliente.' }, name: { type: 'STRING' }, company_name: { type: 'STRING' }, email: { type: 'STRING' }, phone: { type: 'STRING' }, document: { type: 'STRING' }, notes: { type: 'STRING' }, status: { type: 'STRING', enum: ['ativo', 'inativo', 'prospect'] } }, required: ['query'] } },
   { name: 'create_project', description: 'Cria um projeto após confirmação.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, client_name: { type: 'STRING' }, description: { type: 'STRING' }, budget: { type: 'NUMBER' }, due_date: { type: 'STRING' } }, required: ['name'] } },
   { name: 'create_task', description: 'Cria uma tarefa após confirmação.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, description: { type: 'STRING' }, priority: { type: 'STRING', enum: ['baixa', 'media', 'alta', 'urgente'] }, due_date: { type: 'STRING' }, client_name: { type: 'STRING' }, project_name: { type: 'STRING' } }, required: ['title', 'due_date'] } },
+  { name: 'update_task', description: 'Atualiza uma tarefa existente identificada por título ou UUID após confirmação.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Título ou UUID da tarefa.' }, title: { type: 'STRING' }, description: { type: 'STRING' }, priority: { type: 'STRING', enum: ['baixa', 'media', 'alta', 'urgente'] }, status: { type: 'STRING', enum: ['backlog', 'a_fazer', 'em_andamento', 'concluido'] }, due_date: { type: 'STRING', description: 'Data no formato YYYY-MM-DD.' }, client_name: { type: 'STRING' }, project_name: { type: 'STRING' } }, required: ['query'] } },
   { name: 'create_calendar_event', description: 'Agenda compromisso após confirmação.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, description: { type: 'STRING' }, event_type: { type: 'STRING', enum: ['reuniao', 'ligacao', 'tarefa', 'compromisso', 'outro'] }, event_date: { type: 'STRING' }, start_time: { type: 'STRING' }, duration_minutes: { type: 'INTEGER' }, client_name: { type: 'STRING' }, location: { type: 'STRING' } }, required: ['title', 'event_date', 'start_time'] } },
   { name: 'create_financial_transaction', description: 'Registra receita ou despesa após confirmação explícita.', parameters: { type: 'OBJECT', properties: { type: { type: 'STRING', enum: ['receita', 'despesa'] }, description: { type: 'STRING' }, amount: { type: 'NUMBER' }, category: { type: 'STRING' }, due_date: { type: 'STRING' }, status: { type: 'STRING', enum: ['pago', 'pendente', 'atrasado'] }, client_name: { type: 'STRING' } }, required: ['type', 'description', 'amount', 'category', 'due_date'] } },
   { name: 'complete_task', description: 'Marca uma tarefa localizada pelo título ou UUID como concluída após confirmação.', parameters: { type: 'OBJECT', properties: { task_id_or_title: { type: 'STRING' } }, required: ['task_id_or_title'] } },
@@ -237,6 +238,7 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
       table = 'clients'; const found = await findClientId(db, companyId, args.query); if (!found) fail('Cliente não encontrado.');
       const updates: Record<string, unknown> = {}; for (const key of ['name','company_name','email','phone','document','notes','status']) if (args[key] !== undefined) updates[key] = key === 'status' ? args[key] : clean(args[key], key === 'notes' ? 2000 : 255);
       if (!Object.keys(updates).length) fail('Informe ao menos um campo para atualizar.');
+      if (updates.status !== undefined && !['ativo', 'inativo', 'prospect'].includes(String(updates.status))) fail('Informe um status válido para o cliente.');
       const result = await db.from(table).update(updates).eq('company_id', companyId).eq('id', found.id).select('id,name,company_name,email,phone,status').single();
       if (result.error) throw result.error; data = result.data; break;
     }
@@ -255,6 +257,42 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
       let projectId: string | null = null; if (args.project_name) { const found = await db.from('projects').select('id').eq('company_id', companyId).ilike('name', `%${clean(args.project_name, 255).replaceAll('%', '\\%').replaceAll('_', '\\_')}%`).limit(2); if (found.error) throw found.error; if (found.data?.length > 1) fail('Há mais de um projeto com esse nome. Informe o nome completo.'); projectId = found.data?.[0]?.id || null; if (!projectId) fail(`Não encontrei o projeto “${clean(args.project_name, 255)}”.`); }
       const priority = ['baixa','media','alta','urgente'].includes(String(args.priority)) ? args.priority : 'media';
       const result = await db.from(table).insert({ company_id: companyId, title, description: clean(args.description, 2000), priority, due_date: args.due_date, status: 'a_fazer', client_id: client?.id || null, project_id: projectId, assigned_to: userId }).select('id,title,priority,status,due_date').single();
+      if (result.error) throw result.error; data = result.data; break;
+    }
+    case 'update_task': {
+      table = 'tasks'; const term = clean(args.query, 255); if (!term) fail('Informe o título ou UUID da tarefa.');
+      let find = db.from(table).select('id,title').eq('company_id', companyId).limit(2);
+      find = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(term)
+        ? find.eq('id', term)
+        : find.ilike('title', `%${term.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+      const found = await find; if (found.error) throw found.error;
+      if (!found.data?.length) fail('Tarefa não encontrada.');
+      if (found.data.length > 1) fail('Encontrei tarefas com títulos parecidos. Informe um título mais específico.');
+
+      const updates: Record<string, unknown> = {};
+      if (args.title !== undefined) { const title = clean(args.title, 255); if (!title) fail('O título da tarefa não pode ficar vazio.'); updates.title = title; }
+      if (args.description !== undefined) updates.description = clean(args.description, 2000);
+      if (args.priority !== undefined) { if (!['baixa', 'media', 'alta', 'urgente'].includes(String(args.priority))) fail('Informe uma prioridade válida.'); updates.priority = args.priority; }
+      if (args.status !== undefined) { if (!['backlog', 'a_fazer', 'em_andamento', 'concluido'].includes(String(args.status))) fail('Informe um status válido para a tarefa.'); updates.status = args.status; }
+      if (args.due_date !== undefined) { if (!validDate(args.due_date)) fail('Informe o prazo no formato YYYY-MM-DD.'); updates.due_date = args.due_date; }
+      if (args.client_name !== undefined) {
+        const client = clean(args.client_name, 255) ? await findClientId(db, companyId, args.client_name) : null;
+        if (clean(args.client_name, 255) && !client) fail(`Não encontrei o cliente “${clean(args.client_name, 255)}”.`);
+        updates.client_id = client?.id || null;
+      }
+      if (args.project_name !== undefined) {
+        const projectName = clean(args.project_name, 255);
+        if (!projectName) updates.project_id = null;
+        else {
+          const project = await db.from('projects').select('id').eq('company_id', companyId).ilike('name', `%${projectName.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`).limit(2);
+          if (project.error) throw project.error;
+          if (!project.data?.length) fail(`Não encontrei o projeto “${projectName}”.`);
+          if (project.data.length > 1) fail('Há mais de um projeto com esse nome. Informe o nome completo.');
+          updates.project_id = project.data[0].id;
+        }
+      }
+      if (!Object.keys(updates).length) fail('Informe ao menos um campo para atualizar.');
+      const result = await db.from(table).update(updates).eq('company_id', companyId).eq('id', found.data[0].id).select('id,title,description,priority,status,due_date,client_id,project_id').single();
       if (result.error) throw result.error; data = result.data; break;
     }
     case 'complete_task': {
@@ -293,6 +331,7 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
       table = 'calendar_events'; const title = clean(args.title, 255); const date = clean(args.event_date, 10); const time = clean(args.start_time, 5);
       if (!title || !validDate(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) fail('Informe título, data válida e horário no formato HH:mm.');
       const client = args.client_name ? await findClientId(db, companyId, args.client_name) : null;
+      if (args.client_name && !client) fail(`Não encontrei o cliente “${clean(args.client_name, 255)}”.`);
       const result = await db.from(table).insert({ company_id: companyId, user_id: userId, title, description: clean(args.description, 2000), event_type: ['reuniao','ligacao','tarefa','compromisso','outro'].includes(String(args.event_type)) ? args.event_type : 'reuniao', event_date: date, start_time: time, duration_minutes: Math.min(480, Math.max(15, Number(args.duration_minutes) || 60)), client_id: client?.id || null, location: clean(args.location, 255) || null, status: 'agendado' }).select('id,title,event_date,start_time,status').single();
       if (result.error) throw result.error; data = result.data; break;
     }
@@ -305,7 +344,7 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
   }
   const changed = writeTools.has(tool);
   const entity = tool.includes('client') ? 'client' : tool.includes('project') ? 'project' : tool.includes('task') ? 'task' : tool.includes('calendar') ? 'calendar_event' : tool.includes('financial') ? 'financial_transaction' : undefined;
-  const action = ['update_client', 'complete_task', 'reschedule_calendar_event', 'cancel_calendar_event', 'update_calendar_event'].includes(tool)
+  const action = ['update_client', 'update_task', 'complete_task', 'reschedule_calendar_event', 'cancel_calendar_event', 'update_calendar_event'].includes(tool)
     ? 'updated'
     : changed ? 'created' : undefined;
   return {
@@ -374,16 +413,33 @@ async function geminiCall(apiKey: string, contents: unknown[], systemInstruction
     const status = response.status;
     const providerMessage = typeof payload?.error?.message === 'string'
       ? payload.error.message
+        .replaceAll(apiKey, '[credencial omitida]')
         .replace(/(?:AIza|AQ\.)[A-Za-z0-9_.-]{20,}/g, '[credencial omitida]')
         .replace(/[\r\n\t]+/g, ' ')
         .slice(0, 400)
       : '';
-    const message = status === 429
-      ? 'Limite temporário do Gemini atingido. Aguarde e tente novamente.'
-      : status === 400 || status === 401 || status === 403 || status === 404
-        ? `O Gemini recusou a solicitação (HTTP ${status})${providerMessage ? `: ${providerMessage}` : '.'}`
-        : `O serviço Gemini respondeu com erro (${status}).`;
-    throw Object.assign(new Error(message), { status, providerStatus: payload?.error?.status });
+    const providerStatus = String(payload?.error?.status || '');
+    const errorType = status === 429
+      ? 'RATE_LIMIT'
+      : status === 403
+        ? 'PROJECT_RESTRICTED'
+        : status === 404
+          ? 'MODEL_UNAVAILABLE'
+          : status === 400 || status === 401
+            ? providerStatus === 'API_KEY_INVALID' ? 'INVALID_API_KEY' : 'INVALID_REQUEST'
+            : status >= 500 ? 'UPSTREAM_UNAVAILABLE' : 'API_ERROR';
+    const message = errorType === 'RATE_LIMIT'
+      ? 'Limite de requisições ou cota do Gemini atingido. Aguarde ou confira a cota do projeto.'
+      : errorType === 'PROJECT_RESTRICTED'
+        ? `O projeto Gemini não tem acesso à API ou está restrito${providerMessage ? `: ${providerMessage}` : '. Confira o faturamento e as cotas no Google AI Studio.'}`
+        : errorType === 'MODEL_UNAVAILABLE'
+          ? `O modelo Gemini configurado não está disponível para este projeto${providerMessage ? `: ${providerMessage}` : '.'}`
+          : errorType === 'INVALID_API_KEY'
+            ? 'A chave GEMINI_API_KEY foi recusada pelo Google. Atualize o Secret com uma chave válida do projeto autorizado.'
+            : errorType === 'UPSTREAM_UNAVAILABLE'
+              ? `A API do Gemini está temporariamente indisponível (HTTP ${status}). Tente novamente mais tarde.`
+              : `O Gemini recusou a solicitação (HTTP ${status})${providerMessage ? `: ${providerMessage}` : '.'}`;
+    throw Object.assign(new Error(message), { status, providerStatus, errorType });
   }
   return payload;
 }
@@ -500,20 +556,28 @@ Deno.serve(async (req: Request) => {
     return json({ success: false, error: 'A consulta excedeu o limite de etapas do Gemini. Faça uma pergunta mais específica.' }, 502, origin);
   } catch (error: any) {
     const timedOut = error?.name === 'AbortError' || error?.name === 'TimeoutError';
-    const status = Number(error?.status) || (timedOut ? 504 : 400);
-    const message = timedOut ? 'O Gemini demorou mais que o esperado. Tente novamente.' : error?.message || 'Falha ao processar a solicitação.';
-    console.error('[gemini-edge]', String(message).replace(/(?:AIza|AQ\.)[A-Za-z0-9_.-]{30,}/g, '[REDACTED]'));
-    return json({ success: false, error: message, errorType: status === 429 ? 'RATE_LIMIT' : 'API_ERROR' }, status, origin);
+    const transportFailure = error instanceof TypeError && !error?.status;
+    const status = Number(error?.status) || (timedOut ? 504 : transportFailure ? 502 : 400);
+    const errorType = error?.errorType || (timedOut ? 'TIMEOUT' : transportFailure ? 'UPSTREAM_UNAVAILABLE' : status === 429 ? 'RATE_LIMIT' : 'API_ERROR');
+    const message = timedOut
+      ? 'O Gemini demorou mais que o esperado. Tente novamente.'
+      : transportFailure
+        ? 'Não foi possível alcançar a API do Gemini. Verifique a conexão do servidor e tente novamente.'
+        : error?.message || 'Falha ao processar a solicitação.';
+    console.error('[gemini-edge]', errorType, String(message).replace(/(?:AIza|AQ\.)[A-Za-z0-9_.-]{30,}/g, '[REDACTED]'));
+    return json({ success: false, error: message, errorType }, status, origin);
   }
 });
 
 function confirmationMessage(tool: ToolName, args: Record<string, any>) {
   const detail = tool === 'create_financial_transaction'
-    ? `${args.type === 'receita' ? 'receita' : 'despesa'} de R$ ${Number(args.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} — ${clean(args.description, 255)}`
+    ? `${args.type === 'receita' ? 'receita' : 'despesa'} de R$ ${Number(args.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} — ${clean(args.description, 255)}, categoria ${clean(args.category, 100) || 'Outros'}, vencimento ${clean(args.due_date, 10)}${args.status === 'pago' ? ', marcado como pago' : ''}`
     : tool === 'create_calendar_event'
       ? `compromisso “${clean(args.title, 255)}” em ${clean(args.event_date, 10)} às ${clean(args.start_time, 5)}`
       : tool === 'create_task'
         ? `tarefa “${clean(args.title, 255)}” com prazo ${clean(args.due_date, 10)}`
+        : tool === 'update_task'
+          ? `atualização da tarefa “${clean(args.query, 255)}”${args.title ? `: título ${clean(args.title, 255)}` : ''}${args.status ? `, status ${clean(args.status, 30)}` : ''}${args.priority ? `, prioridade ${clean(args.priority, 30)}` : ''}${args.due_date ? `, prazo ${clean(args.due_date, 10)}` : ''}`
         : tool === 'create_project'
           ? `projeto “${clean(args.name, 255)}”`
     : tool === 'complete_task'

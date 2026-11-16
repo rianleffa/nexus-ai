@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-brand-700 dark:text-brand-300' : 'text-slate-400'}`} />
                   <span>{item.label}</span>
                 </div>
               </button>

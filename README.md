@@ -52,15 +52,19 @@ Se o projeto ainda usa a chave pública legada, `VITE_SUPABASE_ANON_KEY` é acei
 
 O Google OAuth usa o fluxo PKCE do Supabase. Cadastre o Client ID e Client Secret Web em **Supabase Dashboard → Authentication → Providers → Google**; não os coloque no código nem no `.env` do frontend.
 
-Em **Authentication → URL Configuration**, configure o Site URL com o domínio de produção real e inclua os retornos locais e de produção na lista de Redirect URLs. O código retorna à origem em que foi aberto (`window.location.origin/`), portanto cada origem precisa estar permitida.
+Configure `VITE_NEXUS_AUTH_REDIRECT_URL` no ambiente **Production** da Vercel como `https://nexus-ai-sigma-sooty.vercel.app/`. Os fluxos de Google OAuth, confirmação de cadastro e recuperação de senha usam esse destino explícito; em desenvolvimento local, a origem atual continua sendo usada.
 
-Para o ambiente atual, use o domínio de produção `https://nexus-ai-rian-ce04.vercel.app/` como Site URL e permita estes retornos:
+Em **Authentication → URL Configuration**, adicione estes destinos à lista de Redirect URLs:
 
 ```text
 http://localhost:5173/
 http://127.0.0.1:5173/
-https://nexus-ai-rian-ce04.vercel.app/
+https://nexus-ai-sigma-sooty.vercel.app/
+https://nexus-ai-sigma-sooty.vercel.app/?auth=confirmed
+https://nexus-ai-sigma-sooty.vercel.app/?auth=recovery
 ```
+
+O `Site URL` é um fallback global do projeto Supabase. Se ele também for usado por outro sistema, mantenha o valor desse sistema: cada aplicação deve enviar seu próprio `redirectTo`/`emailRedirectTo` explícito e ter os destinos exatos permitidos na lista acima.
 
 Confirmação e recuperação retornam à raiz desses mesmos endereços; os parâmetros `auth=confirmed` e `auth=recovery` selecionam a tela dentro do app.
 

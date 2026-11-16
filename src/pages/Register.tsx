@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Shield, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 interface RegisterProps {
   onNavigateToLogin: () => void;
@@ -10,7 +10,7 @@ interface RegisterProps {
 }
 
 export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess }) => {
-  const { register } = useAuth();
+  const { register, resendSignupConfirmation } = useAuth();
   const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
@@ -20,6 +20,8 @@ export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResendingConfirmation, setIsResendingConfirmation] = useState(false);
+  const [confirmationResent, setConfirmationResent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +35,10 @@ export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess
     try {
       const result = await register(name, companyName, email, phone, password);
       if (result.success) onSuccess();
-      else if (result.requiresEmailConfirmation) setNotice(result.error || 'Confirme seu e-mail para continuar.');
+      else if (result.requiresEmailConfirmation) {
+        setConfirmationResent(false);
+        setNotice(result.error || 'Confirme seu e-mail para continuar.');
+      }
       else setError(result.error || 'Não foi possível criar a conta.');
     } catch {
       setError('Não foi possível conectar ao serviço de cadastro. Tente novamente.');
@@ -42,21 +47,34 @@ export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess
     }
   };
 
+  const handleResendConfirmation = async () => {
+    if (isResendingConfirmation) return;
+    setIsResendingConfirmation(true);
+    const result = await resendSignupConfirmation(email);
+    setIsResendingConfirmation(false);
+    if (result.success) {
+      setConfirmationResent(true);
+      setNotice('Se a conta ainda não foi confirmada, enviaremos um novo link para este e-mail.');
+    } else {
+      setError(result.error || 'Não foi possível reenviar a confirmação.');
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4 relative overflow-hidden">
       <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-lg bg-[#0F1622] border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
+      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
         <button
           onClick={onNavigateToLogin}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white mb-6 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-brand-700 mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Voltar para o login</span>
         </button>
 
         <div className="space-y-1 mb-6">
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
             Criar conta no NEXUS AI
           </h2>
           <p className="text-xs text-slate-400">
@@ -76,6 +94,17 @@ export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess
           </div>
         )}
 
+        {notice && !confirmationResent && !isLoading && (
+          <button
+            type="button"
+            onClick={handleResendConfirmation}
+            disabled={isResendingConfirmation}
+            className="mb-4 text-xs text-brand-400 hover:underline disabled:opacity-60"
+          >
+            {isResendingConfirmation ? 'Reenviando confirmação…' : 'Reenviar e-mail de confirmação'}
+          </button>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
@@ -90,7 +119,7 @@ export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess
               required
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="Ex: Tech Solutions"
+              placeholder="Ex: Grupo Horizonte"
             />
           </div>
 

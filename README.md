@@ -37,6 +37,8 @@ npm run dev
 
 No PowerShell, a cópia do arquivo pode ser feita com `Copy-Item .env.example .env`. Configure no `.env` pelo menos a URL base do projeto Supabase e uma chave pública. O endereço local padrão do Vite é `http://localhost:5173/`; também pode ser aberto em `http://127.0.0.1:5173/`.
 
+Para executar a Edge Function Gemini localmente, copie `supabase/functions/.env.example` para `supabase/functions/.env` e configure a chave apenas nesse arquivo. Ele é ignorado pelo Git e não é carregado no frontend Vite.
+
 ### Variáveis do frontend
 
 ```env
@@ -52,17 +54,37 @@ O Google OAuth usa o fluxo PKCE do Supabase. Cadastre o Client ID e Client Secre
 
 Em **Authentication → URL Configuration**, configure o Site URL com o domínio de produção real e inclua os retornos locais e de produção na lista de Redirect URLs. O código retorna à origem em que foi aberto (`window.location.origin/`), portanto cada origem precisa estar permitida.
 
+Para o ambiente atual, use o domínio de produção `https://nexus-ai-rian-ce04.vercel.app/` como Site URL e permita estes retornos:
+
+```text
+http://localhost:5173/
+http://127.0.0.1:5173/
+https://nexus-ai-rian-ce04.vercel.app/
+```
+
+Confirmação e recuperação retornam à raiz desses mesmos endereços; os parâmetros `auth=confirmed` e `auth=recovery` selecionam a tela dentro do app.
+
 No Google Cloud Console, cadastre as origens JavaScript locais e de produção. Em Authorized redirect URIs, use o callback exibido na configuração do provedor Google no Supabase, normalmente:
 
 ```text
 https://<project-ref>.supabase.co/auth/v1/callback
 ```
 
-O primeiro login depende do trigger de criação do perfil/empresa no banco. Para instalações existentes, revise as associações de empresa dos usuários antes de aplicar `supabase/migrations/009_tenant_security_hardening.sql`. Não aplique migrations de desenvolvimento a um banco de produção sem revisar o estado atual.
+O primeiro login depende do trigger de criação do perfil/empresa no banco. A migration `010_auth_profile_provisioning.sql` atualiza o trigger para criar uma empresa isolada para cada usuário novo e preencher dados de perfil dos metadados de cadastro ou Google; ela não reatribui contas existentes. Para instalações existentes, revise o estado das migrations e as associações de empresa antes de aplicar alterações em produção. Não aplique `009_tenant_security_hardening.sql` sem auditar os vínculos atuais.
+
+No OAuth Client Web do Google, adicione os três endereços de origem acima sem a barra final como origens JavaScript autorizadas e use o callback do Supabase deste projeto como URI de redirecionamento autorizado:
+
+```text
+https://aztmenorefrgpdnpedjb.supabase.co/auth/v1/callback
+```
+
+O ambiente local está conectado ao projeto `aztmenorefrgpdnpedjb` (`rianleffa's Project`). Esse banco já possui perfis e empresas vinculados por `user_id`; o login também aceita esse formato, buscando somente a empresa do usuário autenticado. O esquema completo do NEXUS usa `profiles.company_id` e tabelas adicionais. A compatibilidade de login não instala essas tabelas: revise uma migração específica antes de usar os demais módulos nesse banco existente. Preserve os gatilhos e as políticas do projeto durante essa revisão; não execute `schema.sql` nem substitua `handle_new_user` apenas para habilitar o login.
 
 ### Assistente Gemini
 
 O segredo `GEMINI_API_KEY` é usado pela Edge Function em `supabase/functions/gemini`. Configure-o como segredo de servidor do Supabase Edge Functions; não use um nome com prefixo `VITE_`. O assistente depende de a função estar implantada e da chave configurada.
+
+Em produção, configure `VITE_SUPABASE_URL` e a chave pública `VITE_SUPABASE_PUBLISHABLE_KEY` no ambiente Production da Vercel e faça um novo deploy. Configure `GEMINI_API_KEY` como segredo das Edge Functions do Supabase; não armazene a chave Gemini em variáveis `VITE_` da Vercel.
 
 ## Banco de dados e dados de demonstração
 

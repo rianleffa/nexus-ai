@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { Layout } from './components/layout/Layout';
-import { QuickCreateTab } from './components/layout/QuickCreateModal';
 
 // Pages
 import { Login } from './pages/Login';
@@ -19,6 +18,7 @@ import { AIAssistant } from './pages/AIAssistant';
 import { Reports } from './pages/Reports';
 import { Architecture } from './pages/Architecture';
 import { Settings } from './pages/Settings';
+import { PasswordRecovery } from './pages/PasswordRecovery';
 
 import { LandingPage } from './pages/LandingPage';
 
@@ -29,11 +29,26 @@ const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<string>('dashboard');
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string | undefined>(undefined);
   const [navParams, setNavParams] = useState<Record<string, any> | undefined>(undefined);
+  const isPasswordRecovery = new URLSearchParams(window.location.search).get('auth') === 'recovery';
+
+  const returnToLogin = () => {
+    const query = new URLSearchParams(window.location.search);
+    query.delete('auth');
+    const nextUrl = `${window.location.pathname}${query.size ? `?${query}` : ''}`;
+    window.history.replaceState(window.history.state, '', nextUrl);
+    setAuthView('login');
+  };
 
   useEffect(() => {
     if (isAuthenticated && !wasAuthenticated.current) {
       setAuthView('login');
       setCurrentPage('dashboard');
+    }
+    if (isAuthenticated && new URLSearchParams(window.location.search).get('auth') === 'confirmed') {
+      const query = new URLSearchParams(window.location.search);
+      query.delete('auth');
+      const nextUrl = `${window.location.pathname}${query.size ? `?${query}` : ''}${window.location.hash}`;
+      window.history.replaceState(window.history.state, '', nextUrl);
     }
     wasAuthenticated.current = isAuthenticated;
   }, [isAuthenticated]);
@@ -53,13 +68,17 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700">
         <div className="flex items-center gap-3 text-sm" role="status" aria-live="polite">
           <span className="w-4 h-4 rounded-full border-2 border-slate-600 border-t-brand-400 animate-spin" />
           Verificando sessão...
         </div>
       </div>
     );
+  }
+
+  if (isPasswordRecovery) {
+    return <PasswordRecovery onBackToLogin={returnToLogin} />;
   }
 
   // If not authenticated, render LandingPage, Login or Register

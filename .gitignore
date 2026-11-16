@@ -21,6 +21,7 @@ coverage
 .vercel
 .supabase
 supabase/.temp
+supabase/functions/.env
 
 # Generated test and TypeScript artifacts
 playwright-report

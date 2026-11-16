@@ -44,7 +44,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       sender: 'assistant',
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       content:
-        `Olá, **${user?.name.split(' ')[0] || 'bem-vindo(a)'}**! Sou o assistente do **NEXUS Business OS** para **${company?.name || 'sua empresa'}**.\n\n` +
+        `Olá, **${user?.name.split(' ')[0] || 'bem-vindo(a)'}**! Sou o gestor virtual do **NEXUS AI** para **${company?.name || 'sua empresa'}**.\n\n` +
         `Posso responder perguntas e solicitar ações nos módulos quando a integração de IA no servidor estiver disponível. Ações sensíveis aguardam sua confirmação.`,
     },
   ]);
@@ -239,7 +239,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
               className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
                 msg.sender === 'user'
                   ? 'bg-slate-800 text-white dark:bg-slate-700'
-                  : 'bg-gradient-to-tr from-brand-600 to-emerald-400 text-white shadow-glow'
+                  : 'bg-brand-600 text-white shadow-card'
               }`}
             >
               {msg.sender === 'user' ? (
@@ -254,7 +254,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
               className={`flex-1 p-4 rounded-2xl shadow-sm border ${
                 msg.sender === 'user'
                   ? 'bg-brand-600 text-white border-brand-500 rounded-tr-none'
-                  : 'bg-white dark:bg-[#111827] border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 rounded-tl-none'
+                  : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 rounded-tl-none'
               }`}
             >
               <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-black/5 dark:border-white/5 text-[10px] opacity-70">
@@ -304,10 +304,10 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         {/* Loading Indicator */}
         {isLoading && (
           <div className="flex gap-3 text-xs leading-relaxed max-w-xl animate-pulse">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white flex items-center justify-center shadow-glow">
+            <div className="w-8 h-8 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-card">
               <Bot className="w-4 h-4" />
             </div>
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 text-slate-500 rounded-tl-none flex items-center gap-2">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 text-slate-500 rounded-tl-none flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-brand-500 animate-bounce" />
               <span className="w-2 h-2 rounded-full bg-brand-500 animate-bounce [animation-delay:0.2s]" />
               <span className="w-2 h-2 rounded-full bg-brand-500 animate-bounce [animation-delay:0.4s]" />
@@ -352,7 +352,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
             }
           }}
           placeholder="Digite o que você precisa em linguagem natural... (ex: 'Agende uma reunião com João amanhã às 14h')"
-          className="w-full rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-3.5 pr-24 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm resize-none"
+          className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3.5 pr-24 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm resize-none"
         />
 
         <div className="absolute right-3 bottom-3 flex items-center gap-2">

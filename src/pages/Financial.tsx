@@ -112,7 +112,7 @@ export const Financial: React.FC<FinancialProps> = ({
 
       {/* Financial KPIs 5 cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
             <span>Receitas do Mês</span>
             <ArrowUpRight className="w-4 h-4 text-emerald-500" />
@@ -123,7 +123,7 @@ export const Financial: React.FC<FinancialProps> = ({
           <span className="text-[10px] text-slate-400 block mt-1">Realizado em caixa</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
             <span>Despesas do Mês</span>
             <ArrowDownRight className="w-4 h-4 text-rose-500" />
@@ -134,7 +134,7 @@ export const Financial: React.FC<FinancialProps> = ({
           <span className="text-[10px] text-slate-400 block mt-1">Custos operacionais</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-brand-500/30 shadow-xs">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-brand-500/30 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
             <span className="font-semibold text-slate-700 dark:text-slate-300">Saldo Acumulado</span>
             <Wallet className="w-4 h-4 text-brand-500" />
@@ -147,7 +147,7 @@ export const Financial: React.FC<FinancialProps> = ({
           </span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
             <span>A Receber</span>
             <Calendar className="w-4 h-4 text-blue-500" />
@@ -158,7 +158,7 @@ export const Financial: React.FC<FinancialProps> = ({
           <span className="text-[10px] text-slate-400 block mt-1">Pendentes e vencidas em aberto</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
             <span>A Pagar</span>
             <Calendar className="w-4 h-4 text-amber-500" />
@@ -179,7 +179,7 @@ export const Financial: React.FC<FinancialProps> = ({
             placeholder="Buscar lançamentos ou categorias..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
 

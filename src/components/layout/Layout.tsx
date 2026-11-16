@@ -34,7 +34,7 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-[#090D14] text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
       {/* Sidebar */}
       <Sidebar
         currentPage={currentPage}

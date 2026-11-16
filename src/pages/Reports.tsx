@@ -143,7 +143,7 @@ export const Reports: React.FC = () => {
               onClick={() => setPeriod(item.id as any)}
               className={`px-3 py-1.5 rounded-xl font-semibold transition-all shrink-0 ${
                 period === item.id
-                  ? 'bg-brand-500 text-white shadow-xs'
+                  ? 'bg-brand-500 text-slate-900 shadow-xs'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
               }`}
             >
@@ -299,7 +299,7 @@ export const Reports: React.FC = () => {
       </div>
 
       {/* Printable Report Paper Preview */}
-      <Card className="p-8 bg-white dark:bg-[#0E1522] border-slate-200 dark:border-slate-800 shadow-md space-y-6">
+      <Card className="p-8 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-md space-y-6">
         {/* Report Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800 gap-4">
           <div>

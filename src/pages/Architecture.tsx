@@ -95,7 +95,7 @@ export const Architecture: React.FC = () => {
           {standardFlow.map((node, i) => {
             const Icon = node.icon;
             return (
-              <div key={i} className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-xs relative">
+              <div key={i} className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs relative">
                 <div className="flex items-center gap-2.5 mb-2">
                   <div className={`p-2 rounded-lg border ${node.color} bg-slate-50 dark:bg-slate-800/60`}>
                     <Icon className="w-4 h-4" />
@@ -108,7 +108,7 @@ export const Architecture: React.FC = () => {
                   {node.desc}
                 </p>
                 {i < 3 && (
-                  <ArrowRight className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-10 bg-white dark:bg-[#090D14] rounded-full" />
+                  <ArrowRight className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-10 bg-white dark:bg-slate-950 rounded-full" />
                 )}
               </div>
             );
@@ -139,7 +139,7 @@ export const Architecture: React.FC = () => {
                 className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
                   isSelected
                     ? 'border-brand-500 bg-brand-50/30 dark:bg-brand-950/40 shadow-glow'
-                    : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-slate-800 hover:border-brand-500/40'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-brand-500/40'
                 }`}
               >
                 <div>

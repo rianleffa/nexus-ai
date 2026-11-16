@@ -119,6 +119,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const myDayItems = dataStore.getMyDayTimeline();
   const clientsInAlert = dataStore.getClientsNeedingAttention();
   const financialTransactions = dataStore.getFinancialTransactions();
+  const activeProjects = projects.filter((project) => project.status === 'em_andamento').length;
+  const completedTasks = tasks.filter((task) => task.status === 'concluido').length;
+  const taskCompletionRate = tasks.length ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
   // Tasks breakdown
   const today = new Date();
@@ -164,7 +167,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header Operacional — Centro de Operações */}
+      {/* Visão geral empresarial */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -172,7 +175,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {greeting}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}!
             </h1>
             <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 uppercase tracking-wide">
-              Centro de Operações
+              Visão geral da empresa
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -188,8 +191,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       </div>
 
-      {/* 6 Metric KPI Cards (Totalmente Clicáveis e Conectados) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+      {/* Indicadores empresariais conectados aos registros da empresa */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <MetricCard
           title="Clientes Ativos"
           value={metrics.activeClients}
@@ -207,6 +210,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
           icon={<CheckSquare className="w-5 h-5" />}
           iconBg="bg-amber-500/10 text-amber-600 dark:text-amber-400"
           onClick={() => onNavigate('tasks')}
+        />
+        <MetricCard
+          title="Projetos em Andamento"
+          value={activeProjects}
+          subtitle={`${projects.length} projeto(s) no total`}
+          trend="neutral"
+          icon={<FolderKanban className="w-5 h-5" />}
+          iconBg="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+          onClick={() => onNavigate('projects')}
+        />
+        <MetricCard
+          title="Conclusão de Tarefas"
+          value={`${taskCompletionRate}%`}
+          subtitle={`${completedTasks} de ${tasks.length} concluídas`}
+          trend={taskCompletionRate >= 70 ? 'up' : 'neutral'}
+          icon={<CheckCircle2 className="w-5 h-5" />}
+          iconBg="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+          onClick={() => onNavigate('reports')}
         />
         <MetricCard
           title="Compromissos Hoje"
@@ -253,9 +274,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="w-2.5 h-2.5 rounded-full bg-brand-500" />
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  MEU DIA — Linha do Tempo Operacional
+                  Meu dia — agenda e prioridades
                 </h3>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -414,17 +435,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Assistente conectado ao serviço de IA configurado no servidor */}
-      {isSupabaseConfigured && <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-[#0D1826] to-[#0A2218] border border-brand-500/30 p-6 shadow-xl text-white">
+      {isSupabaseConfigured && <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-200 p-6 shadow-card text-slate-900">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 text-xs font-semibold">
-              <Sparkles className="w-3.5 h-3.5 text-brand-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-700 border border-brand-500/30 text-xs font-semibold">
+              <Sparkles className="w-3.5 h-3.5 text-brand-600 animate-pulse" />
               <span>NEXUS AI — Orquestrador Operacional</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
               Como posso acelerar sua empresa agora?
             </h2>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Consulte seus dados e solicite ações nos módulos conectados. Alterações que exigem confirmação continuam sob seu controle.
             </p>
 
@@ -434,7 +455,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   key={idx}
                   onClick={() => onNavigate('ai-assistant', prompt)}
-                  className="text-xs bg-white/10 hover:bg-brand-500/30 hover:border-brand-400 border border-white/10 px-3 py-1.5 rounded-xl transition-all text-slate-200 text-left flex items-center gap-1.5"
+                  className="text-xs bg-slate-50 hover:bg-brand-500/20 hover:border-brand-600 border border-slate-200 px-3 py-1.5 rounded-xl transition-all text-slate-700 text-left flex items-center gap-1.5"
                 >
                   <span>"{prompt}"</span>
                   <ArrowRight className="w-3 h-3 text-brand-400" />
@@ -507,7 +528,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                   <div
                     style={{ width: `${proj.progress}%` }}
-                    className="h-full bg-gradient-to-r from-brand-600 to-emerald-400 rounded-full"
+                    className="h-full bg-brand-500 rounded-full"
                   />
                 </div>
               </div>
@@ -579,7 +600,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div className="w-full flex items-end justify-center gap-1.5 h-36">
                       <div
                         style={{ height: `${recHeight}%` }}
-                        className="w-1/2 max-w-[22px] bg-emerald-500 rounded-t-md hover:bg-emerald-400 transition-all duration-300 relative"
+                        className="w-1/2 max-w-[22px] bg-brand-500 rounded-t-md hover:bg-brand-600 transition-all duration-300 relative"
                         title={`Receita: ${formatBRL(item.receita)}`}
                       />
                       <div
@@ -599,7 +620,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-center justify-between pt-3 text-xs text-slate-500 dark:text-slate-400">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <div className="w-3 h-3 rounded-full bg-brand-500" />
                   <span>Receitas</span>
                 </div>
                 <div className="flex items-center gap-1.5">

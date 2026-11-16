@@ -268,7 +268,7 @@ export const Calendar: React.FC<CalendarProps> = ({ onNavigate }) => {
       </div>
 
       {/* Month Navigator Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
             <CalendarIcon className="w-5 h-5" />
@@ -346,14 +346,14 @@ export const Calendar: React.FC<CalendarProps> = ({ onNavigate }) => {
                       ? 'border-brand-500 bg-brand-50/20 dark:bg-brand-950/20 shadow-xs'
                       : isSelected
                       ? 'border-slate-400 dark:border-slate-600 bg-slate-100/60 dark:bg-slate-800/40'
-                      : 'border-slate-100 dark:border-slate-800/80 bg-white dark:bg-[#111827] hover:border-brand-500/40'
+                      : 'border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900 hover:border-brand-500/40'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span
                       className={`text-xs font-bold ${
                         isToday
-                          ? 'w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center shadow-xs'
+                          ? 'w-6 h-6 rounded-full bg-brand-500 text-slate-900 flex items-center justify-center shadow-xs'
                           : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >

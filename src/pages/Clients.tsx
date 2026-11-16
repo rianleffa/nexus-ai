@@ -176,7 +176,7 @@ export const Clients: React.FC<ClientsProps> = ({
           <Card className="p-6 space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white text-2xl font-bold shadow-glow shrink-0">
+                <div className="w-16 h-16 rounded-2xl bg-brand-500 flex items-center justify-center text-white text-2xl font-bold shadow-card shrink-0">
                   {selectedClient.name.charAt(0)}
                 </div>
                 <div>
@@ -412,7 +412,7 @@ export const Clients: React.FC<ClientsProps> = ({
 
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                 Total de Clientes
               </span>
@@ -420,7 +420,7 @@ export const Clients: React.FC<ClientsProps> = ({
                 {clients.length}
               </span>
             </div>
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
               <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
                 Clientes Ativos
               </span>
@@ -428,7 +428,7 @@ export const Clients: React.FC<ClientsProps> = ({
                 {activeCount}
               </span>
             </div>
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
               <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
                 Prospects
               </span>
@@ -436,7 +436,7 @@ export const Clients: React.FC<ClientsProps> = ({
                 {prospectCount}
               </span>
             </div>
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                 Sem Atividade
               </span>
@@ -455,7 +455,7 @@ export const Clients: React.FC<ClientsProps> = ({
                 placeholder="Buscar por nome, empresa ou e-mail..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
 

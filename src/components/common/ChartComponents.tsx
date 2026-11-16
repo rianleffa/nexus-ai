@@ -24,11 +24,11 @@ export const MonthlyComparisonChart: React.FC<MonthlyBarProps> = ({ data, height
       {/* Legend */}
       <div className="flex items-center justify-end gap-4 text-xs">
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-md bg-emerald-500" />
+          <span className="w-3 h-3 rounded-md bg-brand-500" />
           <span className="text-slate-600 dark:text-slate-400 font-medium">Receitas</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-md bg-rose-500" />
+          <span className="w-3 h-3 rounded-md bg-slate-400" />
           <span className="text-slate-600 dark:text-slate-400 font-medium">Despesas</span>
         </div>
       </div>
@@ -51,8 +51,8 @@ export const MonthlyComparisonChart: React.FC<MonthlyBarProps> = ({ data, height
               {isHovered && (
                 <div className="absolute -top-14 z-20 bg-slate-900 text-white text-[10px] p-2 rounded-xl shadow-xl border border-slate-700 whitespace-nowrap pointer-events-none animate-in fade-in zoom-in-95">
                   <p className="font-bold text-slate-300 mb-0.5">{item.month} / 2026</p>
-                  <p className="text-emerald-400">Rec: {formatBRL(item.revenue)}</p>
-                  <p className="text-rose-400">Desp: {formatBRL(item.expenses)}</p>
+              <p className="text-brand-300">Rec: {formatBRL(item.revenue)}</p>
+              <p className="text-slate-300">Desp: {formatBRL(item.expenses)}</p>
                 </div>
               )}
 
@@ -61,13 +61,13 @@ export const MonthlyComparisonChart: React.FC<MonthlyBarProps> = ({ data, height
                 <div
                   style={{ height: `${Math.max(revHeightPct, 4)}%` }}
                   className={`w-1/2 rounded-t-md transition-all ${
-                    item.revenue > 0 ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-slate-200 dark:bg-slate-800'
+                    item.revenue > 0 ? 'bg-brand-500 group-hover:bg-brand-600' : 'bg-slate-200 dark:bg-slate-800'
                   }`}
                 />
                 <div
                   style={{ height: `${Math.max(expHeightPct, 4)}%` }}
                   className={`w-1/2 rounded-t-md transition-all ${
-                    item.expenses > 0 ? 'bg-rose-500 group-hover:bg-rose-400' : 'bg-slate-200 dark:bg-slate-800'
+                    item.expenses > 0 ? 'bg-slate-400 group-hover:bg-slate-500' : 'bg-slate-200 dark:bg-slate-800'
                   }`}
                 />
               </div>
@@ -96,13 +96,13 @@ export const CategoryDonutChart: React.FC<CategoryDonutProps> = ({ categories })
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   const colors = [
-    '#3B82F6', // Blue
-    '#10B981', // Emerald
-    '#F59E0B', // Amber
-    '#EC4899', // Pink
-    '#8B5CF6', // Purple
-    '#06B6D4', // Cyan
-    '#64748B', // Slate
+    '#E87532',
+    '#687386',
+    '#D96527',
+    '#9CA3AF',
+    '#913E20',
+    '#4B5563',
+    '#D1D5DB',
   ];
 
   const entries = Object.entries(categories).filter(([_, val]) => val > 0);

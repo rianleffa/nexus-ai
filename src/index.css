@@ -2,9 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --nexus-orange: #E87532;
+  --nexus-orange-dark: #D96527;
+  --nexus-orange-soft: #FFF3EB;
+  --nexus-surface: #FFFFFF;
+  --nexus-background: #F5F6F8;
+  --nexus-graphite: #252A32;
+  --nexus-muted: #687386;
+  --nexus-border: #E5E7EB;
+}
+
+.dark {
+  color-scheme: dark;
+  --nexus-surface: #1B2027;
+  --nexus-background: #15191F;
+  --nexus-graphite: #F5F6F8;
+  --nexus-muted: #9CA3AF;
+  --nexus-border: #303640;
+}
+
 @layer base {
   body {
-    @apply antialiased text-slate-800 bg-slate-50 dark:bg-[#090D14] dark:text-slate-100 selection:bg-brand-500 selection:text-white;
+    @apply antialiased text-slate-900 bg-slate-50 selection:bg-brand-100 selection:text-brand-900;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   }
 }

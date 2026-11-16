@@ -12,26 +12,46 @@ interface LoginProps {
   onSuccess: () => void;
 }
 
+const readOAuthErrorFromUrl = () => {
+  const query = new URLSearchParams(window.location.search);
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  const hasAuthorizationCode = query.has('code') || fragment.has('code') || fragment.has('access_token');
+  const error = fragment.get('error_description') || query.get('error_description') || fragment.get('error') || query.get('error');
+  if (!error || hasAuthorizationCode) return null;
+
+  const errorCode = fragment.get('error_code') || query.get('error_code') || error;
+  return errorCode === 'access_denied' || /cancel|denied/i.test(error)
+    ? 'O acesso com Google foi cancelado. Você pode tentar novamente.'
+    : 'O Google não concluiu a autenticação. Verifique a configuração OAuth e tente novamente.';
+};
+
 export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateToLanding, onSuccess }) => {
-  const { login, loginWithGoogle, loginDemo, authError } = useAuth();
+  const { login, loginWithGoogle, loginDemo, sendPasswordRecovery, authError } = useAuth();
   const { showToast } = useNotification();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [oauthError, setOAuthError] = useState<string | null>(null);
+  const [oauthError, setOAuthError] = useState<string | null>(readOAuthErrorFromUrl);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [isResetLoading, setIsResetLoading] = useState(false);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const authNotice = new URLSearchParams(window.location.search).get('auth') === 'confirmed'
+    ? 'E-mail confirmado. Entre para continuar.'
+    : null;
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const fragment = new URLSearchParams(window.location.hash.slice(1));
-    const hasAuthorizationCode = query.has('code') || fragment.has('code') || fragment.has('access_token');
     const error = fragment.get('error_description') || query.get('error_description') || fragment.get('error') || query.get('error');
+    if (query.get('auth') === 'confirmed') {
+      query.delete('auth');
+      const nextUrl = `${window.location.pathname}${query.size ? `?${query}` : ''}${window.location.hash}`;
+      window.history.replaceState(window.history.state, '', nextUrl);
+    }
+    const hasAuthorizationCode = query.has('code') || fragment.has('code') || fragment.has('access_token');
     if (!error || hasAuthorizationCode) return;
-
-    const errorCode = fragment.get('error_code') || query.get('error_code') || error;
-    setOAuthError(errorCode === 'access_denied' || /cancel|denied/i.test(error)
-      ? 'O acesso com Google foi cancelado. Você pode tentar novamente.'
-      : 'O Google não concluiu a autenticação. Verifique a configuração OAuth e tente novamente.');
 
     // Remove OAuth error parameters from the address bar without touching a PKCE code.
     for (const key of ['error', 'error_code', 'error_description', 'error_uri']) {
@@ -64,24 +84,39 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
     }
   };
 
+  const handlePasswordRecovery = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isResetLoading) return;
+    setResetNotice(null);
+    setResetError(null);
+    setIsResetLoading(true);
+    const result = await sendPasswordRecovery(email);
+    setIsResetLoading(false);
+    if (result.success) {
+      setResetNotice('Se houver uma conta para este e-mail, enviaremos um link para redefinir a senha.');
+    } else {
+      setResetError(result.error || 'Não foi possível solicitar a recuperação de senha.');
+    }
+  };
+
   const handleDemoAccess = () => {
     loginDemo();
     onSuccess();
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4 relative overflow-hidden">
       {/* Background Ambient Glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-72 h-72 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-72 h-72 bg-brand-50 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md bg-[#0F1622] border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
+      <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
         {/* Brand Header */}
         <div className="text-center space-y-2 mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white font-black text-2xl shadow-glow mb-2">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-brand-500 text-white font-black text-2xl shadow-card mb-2">
             N
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white flex items-center justify-center gap-1.5">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-center justify-center gap-1.5">
             <span>NEXUS</span>
             <span className="text-brand-400">AI</span>
           </h1>
@@ -90,9 +125,21 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
           </p>
         </div>
 
-        {(oauthError || authError) && (
-          <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm text-rose-200" role="alert" aria-live="polite">
-            {oauthError || authError}
+        {(oauthError || authError || resetError) && (
+          <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm text-rose-800" role="alert" aria-live="polite">
+            {oauthError || authError || resetError}
+          </div>
+        )}
+
+        {authNotice && (
+          <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800" role="status" aria-live="polite">
+            {authNotice}
+          </div>
+        )}
+
+        {resetNotice && (
+          <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800" role="status" aria-live="polite">
+            {resetNotice}
           </div>
         )}
 
@@ -117,16 +164,38 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
           </Button>
         </div>}
 
-        <div className="relative flex items-center justify-center mb-5">
-          <div className="border-t border-slate-800 w-full" />
-          <span className="bg-[#0F1622] px-3 text-[10px] text-slate-500 uppercase tracking-wider">
+        {!isResetMode && <div className="relative flex items-center justify-center mb-5">
+          <div className="border-t border-slate-200 w-full" />
+          <span className="bg-white px-3 text-[10px] text-slate-500 uppercase tracking-wider">
             Ou acesse com credenciais
           </span>
-          <div className="border-t border-slate-800 w-full" />
-        </div>
+          <div className="border-t border-slate-200 w-full" />
+        </div>}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        {isResetMode ? (
+          <form onSubmit={handlePasswordRecovery} className="space-y-3.5">
+            <div className="text-sm text-slate-600">Informe o e-mail da sua conta. Enviaremos um link seguro para redefinir a senha.</div>
+            <Input
+              label="E-mail"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu.email@empresa.com"
+            />
+            <Button type="submit" variant="primary" size="md" isLoading={isResetLoading} className="w-full">
+              Enviar link de recuperação
+            </Button>
+            <button
+              type="button"
+              onClick={() => { setIsResetMode(false); setResetError(null); setResetNotice(null); }}
+              className="w-full text-xs text-slate-600 hover:text-brand-700"
+            >
+              Voltar para o login
+            </button>
+          </form>
+        ) : <form onSubmit={handleSubmit} className="space-y-3.5">
           <Input
             label="E-mail"
             type="email"
@@ -138,7 +207,14 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-slate-300">Senha</label>
+              <label className="text-xs font-medium text-slate-600">Senha</label>
+              {isSupabaseConfigured && <button
+                type="button"
+                onClick={() => { setIsResetMode(true); setResetError(null); setResetNotice(null); }}
+                className="text-xs text-brand-400 hover:underline"
+              >
+                Esqueceu a senha?
+              </button>}
             </div>
             <Input
               type="password"
@@ -167,7 +243,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
             onClick={handleGoogleLogin}
             isLoading={isGoogleLoading}
             disabled={isLoading}
-            className="w-full border-slate-800 text-slate-300 hover:bg-slate-900"
+            className="w-full border-slate-200 text-slate-600 hover:bg-slate-100"
           >
             <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
               <path
@@ -189,10 +265,10 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
             </svg>
             Continuar com Google
           </Button>}
-        </form>
+        </form>}
 
         {/* Bottom Links */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+        <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-400">
           <div>
             Não tem uma conta?{' '}
             <button
@@ -206,7 +282,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
           {onNavigateToLanding && (
             <button
               onClick={onNavigateToLanding}
-              className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors"
+              className="flex items-center gap-1 text-slate-600 hover:text-brand-700 transition-colors"
             >
               <Globe className="w-3.5 h-3.5" />
               <span>Ver Landing Page</span>

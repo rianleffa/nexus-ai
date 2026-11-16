@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 flex flex-col bg-white dark:bg-[#0E1420] border-r border-slate-200/80 dark:border-slate-800/80 transition-transform duration-300 ease-in-out ${
+        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 flex flex-col bg-white dark:bg-slate-950 border-r border-slate-200/80 dark:border-slate-800/80 transition-transform duration-300 ease-in-out ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -96,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => handleNav('dashboard')}
             className="flex items-center gap-2.5 cursor-pointer group select-none"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center shadow-glow text-white font-black text-base tracking-wider">
+            <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center shadow-card text-white font-black text-base tracking-wider">
               N
             </div>
             <div>
@@ -108,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   AI
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium">Business OS</p>
+              <p className="text-[10px] text-slate-400 font-medium">Gestão empresarial</p>
             </div>
           </div>
         </div>
@@ -128,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => handleNav(item.id)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 select-none ${
                   isActive
-                    ? 'bg-brand-500 text-white shadow-sm font-semibold'
+                    ? 'bg-brand-50 text-brand-700 shadow-sm font-semibold dark:bg-brand-950 dark:text-brand-300'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
               >
@@ -145,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div ref={userMenuRef} className="relative p-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40">
           {/* User Popover Menu */}
           {isUserMenuOpen && (
-            <div className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-bottom-2">
+            <div className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-bottom-2">
               <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
                 <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
                   {displayName}

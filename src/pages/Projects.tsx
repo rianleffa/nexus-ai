@@ -141,7 +141,7 @@ export const Projects: React.FC<ProjectsProps> = ({
               <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div
                   style={{ width: `${selectedProject.progress}%` }}
-                  className="h-full bg-gradient-to-r from-brand-600 to-emerald-400 rounded-full transition-all duration-500"
+                  className="h-full bg-brand-500 rounded-full transition-all duration-500"
                 />
               </div>
             </div>

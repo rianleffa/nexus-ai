@@ -46,7 +46,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   };
 
   return (
-    <header className="h-16 bg-white/80 dark:bg-[#0E1420]/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-16 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30">
       {/* Left: Mobile Toggle & Global Search Trigger */}
       <div className="flex items-center gap-3">
         <button

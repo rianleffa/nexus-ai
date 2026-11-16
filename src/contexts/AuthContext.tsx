@@ -13,6 +13,9 @@ interface AuthContextType {
   authError: string | null;
   login: (email: string, pass: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  resendSignupConfirmation: (email: string) => Promise<{ success: boolean; error?: string }>;
+  sendPasswordRecovery: (email: string) => Promise<{ success: boolean; error?: string }>;
+  completePasswordRecovery: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   loginDemo: () => void;
   register: (name: string, companyName: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }>;
   updateProfile: (updates: Partial<User>) => Promise<boolean>;
@@ -20,10 +23,18 @@ interface AuthContextType {
   changePassword: (newPassword: string) => Promise<{ success: boolean; message: string }>;
   uploadAvatar: (file: File) => Promise<string>;
   removeAvatar: () => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const authRedirectUrl = (params: Record<string, string> = {}) => {
+  const redirectUrl = new URL('/', window.location.origin);
+  Object.entries(params).forEach(([key, value]) => redirectUrl.searchParams.set(key, value));
+  return redirectUrl.toString();
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
@@ -42,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           job_title: parsed.job_title || defaultUser.job_title,
           status: parsed.status || defaultUser.status,
         };
-      } catch (e) {}
+      } catch {}
     }
     return null;
   });
@@ -51,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSupabaseConfigured || !localStorage.getItem('nexus_auth_user')) return null;
     const saved = localStorage.getItem('nexus_auth_company');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch {}
     }
     return null;
   });
@@ -63,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .select('*')
       .eq('user_id', authUser.id)
       .maybeSingle();
-    if (profileError || !profile?.company_id) {
+    if (profileError || !profile) {
       console.error('[Auth] Perfil da empresa não encontrado para a sessão atual.', profileError);
       setUser(null);
       setCompany(null);
@@ -71,11 +82,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
-    const { data: companyRow, error: companyError } = await supabase
+    const companyQuery = supabase
       .from('companies')
-      .select('*')
-      .eq('id', profile.company_id)
-      .maybeSingle();
+      .select('*');
+    // Existing projects can link the company directly to its authenticated owner.
+    // Always scope that lookup to this user instead of selecting an arbitrary tenant.
+    const { data: companyRow, error: companyError } = await (profile.company_id
+      ? companyQuery.eq('id', profile.company_id)
+      : companyQuery.eq('user_id', authUser.id)
+    ).maybeSingle();
     if (companyError || !companyRow) {
       console.error('[Auth] Empresa da sessão atual não encontrada.', companyError);
       setUser(null);
@@ -84,11 +99,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
-    const displayName = profile.display_name || profile.full_name || authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário';
+    const ownsCompany = companyRow.user_id === authUser.id;
+    const displayName = profile.display_name || profile.full_name || profile.name || authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário';
     const tenant: Company = {
       id: companyRow.id,
       name: companyRow.name,
-      cnpj: companyRow.cnpj || undefined,
+      cnpj: companyRow.cnpj || companyRow.document || undefined,
       segment: companyRow.segment || undefined,
       phone: companyRow.phone || undefined,
       email: companyRow.email || undefined,
@@ -102,13 +118,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     const loggedUser: User = {
       id: authUser.id,
-      company_id: profile.company_id,
+      company_id: companyRow.id,
       name: displayName,
       full_name: profile.full_name || displayName,
       display_name: displayName,
       email: profile.email || authUser.email || '',
-      role: profile.role || 'colaborador',
-      job_title: profile.job_title || 'Colaborador',
+      role: profile.role || (ownsCompany ? 'admin' : 'colaborador'),
+      job_title: profile.job_title || (ownsCompany ? 'Administrador' : 'Colaborador'),
       avatar_url: profile.avatar_url || '',
       phone: profile.phone || undefined,
       bio: profile.bio || undefined,
@@ -140,7 +156,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Handle Supabase OAuth redirection & session recovery
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
-      setIsLoading(false);
       return;
     }
     const authClient = supabase;
@@ -173,7 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = authClient.auth.onAuthStateChange((event, session) => {
       window.setTimeout(() => {
         if (!active) return;
-        if (session?.user && ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+        if (session?.user && ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED', 'PASSWORD_RECOVERY'].includes(event)) {
           void applyAuthenticatedUser(session.user).finally(() => {
             if (active) setIsLoading(false);
           });
@@ -206,21 +221,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Remote sync with Supabase (fetch initial data & subscribe to realtime changes)
   useEffect(() => {
-    if (isSupabaseConfigured && user) {
-      supabaseSync.fetchRemoteData(company?.id).then((remoteData) => {
-        if (remoteData) {
+    if (isSupabaseConfigured && user?.id) {
+      let active = true;
+      void supabaseSync.fetchRemoteData(company?.id).then((remoteData) => {
+        if (active && remoteData) {
           dataStore.syncFromRemote(remoteData);
         }
       });
 
       const unsubRealtime = supabaseSync.subscribeToRealtime(async () => {
         const remoteData = await supabaseSync.fetchRemoteData(company?.id);
-        if (remoteData) {
+        if (active && remoteData) {
           dataStore.syncFromRemote(remoteData);
         }
       });
 
       return () => {
+        active = false;
         unsubRealtime();
       };
     }
@@ -238,9 +255,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!isSupabaseConfigured || !supabase || !email || !pass) return false;
     try {
       setAuthError(null);
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: normalizeEmail(email), password: pass });
       if (error || !data.user) {
-        setAuthError('Não foi possível entrar. Confira o e-mail e a senha.');
+        const message = error?.message.toLowerCase() || '';
+        setAuthError(message.includes('email not confirmed')
+          ? 'Confirme seu e-mail pelo link enviado antes de entrar.'
+          : 'Não foi possível entrar. Confira o e-mail e a senha.');
         return false;
       }
       return await applyAuthenticatedUser(data.user);
@@ -261,7 +281,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: authRedirectUrl(),
           queryParams: { prompt: 'select_account' },
         },
       });
@@ -285,15 +305,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resendSignupConfirmation = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: 'A confirmação por e-mail exige a configuração do Supabase Auth.' };
+    }
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) return { success: false, error: 'Informe um e-mail válido para reenviar a confirmação.' };
+
+    try {
+      setAuthError(null);
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: normalizedEmail,
+        options: { emailRedirectTo: authRedirectUrl({ auth: 'confirmed' }) },
+      });
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'Não foi possível reenviar o e-mail de confirmação.' };
+    }
+  };
+
+  const sendPasswordRecovery = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: 'A recuperação de senha exige a configuração do Supabase Auth.' };
+    }
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) return { success: false, error: 'Informe um e-mail válido.' };
+
+    try {
+      setAuthError(null);
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: authRedirectUrl({ auth: 'recovery' }),
+      });
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'Não foi possível enviar o link de recuperação.' };
+    }
+  };
+
+  const completePasswordRecovery = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: 'A recuperação de senha exige a configuração do Supabase Auth.' };
+    }
+    if (newPassword.length < 8) return { success: false, error: 'A senha deve ter pelo menos 8 caracteres.' };
+
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session) return { success: false, error: 'Este link de recuperação expirou ou já foi usado. Solicite um novo link.' };
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+      if (signOutError) console.error('[Auth] Senha atualizada, mas não foi possível encerrar a sessão de recuperação.');
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'Não foi possível atualizar a senha.' };
+    }
+  };
+
   const register = async (name: string, companyName: string, email: string, phone: string, password: string) => {
     if (!isSupabaseConfigured || !supabase) {
       return { success: false, error: 'O cadastro seguro exige a configuração do Supabase Auth.' };
     }
     try {
+      setAuthError(null);
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: normalizeEmail(email),
         password,
-        options: { data: { full_name: name, company_name: companyName, phone } },
+        options: {
+          data: { full_name: name.trim(), company_name: companyName.trim(), phone: phone.trim() },
+          emailRedirectTo: authRedirectUrl({ auth: 'confirmed' }),
+        },
       });
       if (error) return { success: false, error: error.message };
       if (!data.session || !data.user) {
@@ -433,8 +519,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase.auth.signOut();
-      } catch (e) {}
+        const { error } = await supabase.auth.signOut({ scope: 'local' });
+        if (error) {
+          setAuthError('Não foi possível encerrar sua sessão. Tente novamente.');
+          return;
+        }
+      } catch (error) {
+        console.error('[Auth] Não foi possível encerrar a sessão do Supabase.', error);
+        setAuthError('Não foi possível encerrar sua sessão. Tente novamente.');
+        return;
+      }
     }
     setUser(null);
     setCompany(null);
@@ -451,6 +545,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authError,
         login,
         loginWithGoogle,
+        resendSignupConfirmation,
+        sendPasswordRecovery,
+        completePasswordRecovery,
         loginDemo,
         register,
         updateProfile,

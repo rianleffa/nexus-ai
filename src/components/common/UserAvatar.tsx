@@ -71,7 +71,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
         />
       ) : (
         <div
-          className={`rounded-xl bg-gradient-to-tr from-brand-600 via-emerald-600 to-teal-400 flex items-center justify-center font-bold text-white shadow-xs ring-2 ring-brand-500/20 tracking-wider ${sizeClasses[size]} ${className}`}
+          className={`rounded-xl bg-brand-600 flex items-center justify-center font-bold text-white shadow-xs ring-2 ring-brand-500/20 tracking-wider ${sizeClasses[size]} ${className}`}
         >
           {initials}
         </div>

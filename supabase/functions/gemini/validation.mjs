@@ -4,3 +4,9 @@ export function validDate(value) {
   const parsed = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
+
+export function isInvalidApiKey(status, providerStatus, providerMessage) {
+  return (status === 400 || status === 401) && (
+    providerStatus === 'API_KEY_INVALID' || /api\s*key\s*(?:is\s*)?not\s*valid|invalid\s+api\s*key/i.test(String(providerMessage || ''))
+  );
+}

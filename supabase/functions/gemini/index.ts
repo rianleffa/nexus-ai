@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
-import { validDate } from './validation.mjs';
+import { isInvalidApiKey, validDate } from './validation.mjs';
 
 const allowedOrigins = new Set([
   'https://nexus-ai-sigma-sooty.vercel.app',
@@ -442,14 +442,16 @@ async function geminiCall(apiKey: string, contents: unknown[], systemInstruction
         .slice(0, 400)
       : '';
     const providerStatus = String(payload?.error?.status || '');
-    const errorType = status === 429
+    const errorType = isInvalidApiKey(status, providerStatus, providerMessage)
+      ? 'INVALID_API_KEY'
+      : status === 429
       ? 'RATE_LIMIT'
       : status === 403
         ? 'PROJECT_RESTRICTED'
         : status === 404
           ? 'MODEL_UNAVAILABLE'
           : status === 400 || status === 401
-            ? providerStatus === 'API_KEY_INVALID' ? 'INVALID_API_KEY' : 'INVALID_REQUEST'
+            ? 'INVALID_REQUEST'
             : status >= 500 ? 'UPSTREAM_UNAVAILABLE' : 'API_ERROR';
     const message = errorType === 'RATE_LIMIT'
       ? 'Limite de requisições ou cota do Gemini atingido. Aguarde ou confira a cota do projeto.'
@@ -471,7 +473,7 @@ Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return new Response('ok', { headers: headersFor(origin) });
   if (req.method !== 'POST' || (origin && !allowedOrigins.has(origin))) return json({ success: false, error: 'Origem ou método não permitido.' }, 403, origin);
-  const apiKey = Deno.env.get('GEMINI_API_KEY');
+  const apiKey = Deno.env.get('GEMINI_API_KEY')?.trim();
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   // Supabase now injects named publishable keys. Keep the legacy anon key as a
   // compatibility fallback for projects that have not migrated yet.

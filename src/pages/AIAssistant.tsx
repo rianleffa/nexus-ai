@@ -80,13 +80,15 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       const response = await AIService.processMessage(textToSend, [...messages, userMsg]);
       setMessages((prev) => [...prev, response]);
 
-      if (response.toolCall?.status === 'success') {
+      if (response.toolCall?.status === 'success' && response.toolCall.result?.changesMade) {
         confetti({
           particleCount: 40,
           spread: 50,
           origin: { y: 0.8 },
         });
         showToast('Ação executada com sucesso pelo Assistente IA!', 'success');
+      } else if (response.toolCall?.status === 'success') {
+        showToast('Consulta concluída com dados do Supabase.', 'success');
       }
     } catch (err: any) {
       setMessages((prev) => [
@@ -105,7 +107,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
 
   const handleConfirmAction = async (confId: string, toolName: string, parameters: Record<string, any>) => {
     try {
-      const { message, result } = await AIService.executeConfirmed(toolName, parameters);
+      const pending = messages.find((msg) => msg.pendingConfirmation?.id === confId)?.pendingConfirmation;
+      if (!pending?.confirmationToken) throw new Error('Confirmação inválida ou expirada. Envie a solicitação novamente.');
+      const { message, result } = await AIService.executeConfirmed(pending.confirmationToken);
       
       confetti({
         particleCount: 50,
@@ -113,7 +117,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         origin: { y: 0.8 },
       });
 
-      showToast('Ação autorizada e executada com sucesso!', 'success');
+      showToast('Ação confirmada e gravada no Supabase.', 'success');
 
       // Update the message in chat
       setMessages((prev) =>
@@ -129,7 +133,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
                 steps: [
                   { label: 'Autorização recebida do usuário', status: 'success' },
                   { label: `Execução da ferramenta: ${toolName}`, status: 'success' },
-                  { label: 'Alteração persistida no banco de dados', status: 'success' },
+                  { label: 'Alteração confirmada pelo Supabase', status: 'success' },
                 ],
                 result,
                 status: 'success',
@@ -141,22 +145,54 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       );
     } catch (e: any) {
       showToast(`Erro ao confirmar: ${e.message}`, 'error');
+      setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
+        ? {
+            ...msg,
+            content: `A operação não foi confirmada pelo Supabase: ${e?.message || 'erro inesperado'}`,
+            pendingConfirmation: undefined,
+            toolCall: {
+              toolName,
+              parameters,
+              steps: [
+                { label: 'Confirmação recebida', status: 'success' },
+                { label: 'Persistência no Supabase', status: 'error', detail: e?.message || 'A operação não foi concluída.' },
+              ],
+              status: 'error',
+            },
+          }
+        : msg));
     }
   };
 
-  const handleCancelAction = (confId: string) => {
-    setMessages((prev) =>
-      prev.map((msg) => {
-        if (msg.pendingConfirmation?.id === confId) {
-          return {
-            ...msg,
-            content: 'Operação cancelada pelo usuário. Nenhuma alteração foi realizada.',
-            pendingConfirmation: undefined,
-          };
-        }
-        return msg;
-      })
-    );
+  const handleCancelAction = async (confId: string) => {
+    const pending = messages.find((msg) => msg.pendingConfirmation?.id === confId)?.pendingConfirmation;
+    if (!pending?.confirmationToken) return;
+    try {
+      await AIService.cancelConfirmation(pending.confirmationToken);
+      setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
+        ? { ...msg, content: 'Operação cancelada. Nenhuma alteração foi realizada.', pendingConfirmation: undefined }
+        : msg));
+    } catch (error: any) {
+      showToast(error?.message || 'Não foi possível cancelar esta confirmação.', 'error');
+      setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
+        ? { ...msg, content: `Não foi possível confirmar o cancelamento: ${error?.message || 'erro inesperado'}. Nenhuma alteração de negócio foi executada.`, pendingConfirmation: undefined, toolCall: { toolName: pending.toolName, parameters: pending.parameters, steps: [{ label: 'Cancelamento no servidor', status: 'error' }], status: 'error' } }
+        : msg));
+    }
+  };
+
+  const handleClearConversation = async () => {
+    const pending = messages.flatMap((msg) => msg.pendingConfirmation ? [msg.pendingConfirmation] : []);
+    try {
+      await Promise.all(pending.map((item) => AIService.cancelConfirmation(item.confirmationToken)));
+      setMessages([{
+        id: `new-${Date.now()}`,
+        sender: 'assistant',
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        content: 'Histórico reiniciado. Como posso ajudar com a gestão da empresa agora?',
+      }]);
+    } catch (error: any) {
+      showToast(error?.message || 'Não foi possível cancelar uma confirmação pendente.', 'error');
+    }
   };
 
   if (!isSupabaseConfigured) {
@@ -188,7 +224,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
               <span>NEXUS AI</span>
             </h1>
             <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
-              Tool Calling Engine v2.4
+              Gemini 3.8 Flash • Function Calling
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -208,16 +244,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              setMessages([
-                {
-                  id: `new-${Date.now()}`,
-                  sender: 'assistant',
-                  timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                  content: 'Histórico reiniciado. Como posso ajudar com a gestão da empresa agora?',
-                },
-              ]);
-            }}
+            onClick={() => void handleClearConversation()}
             leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
           >
             Limpar
@@ -294,7 +321,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
                       msg.pendingConfirmation!.parameters
                     )
                   }
-                  onCancel={() => handleCancelAction(msg.pendingConfirmation!.id)}
+                  onCancel={() => void handleCancelAction(msg.pendingConfirmation!.id)}
                 />
               )}
             </div>

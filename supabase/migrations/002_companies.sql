@@ -5,6 +5,7 @@
 
 CREATE TABLE IF NOT EXISTS public.companies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     cnpj VARCHAR(30),
     segment VARCHAR(100),
@@ -49,22 +50,21 @@ $$ LANGUAGE SQL STABLE SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
-    default_tenant_id UUID;
+    new_tenant_id UUID;
     user_full_name TEXT;
+    company_name TEXT;
 BEGIN
-    SELECT id INTO default_tenant_id FROM public.companies ORDER BY created_at ASC LIMIT 1;
-    
-    IF default_tenant_id IS NULL THEN
-        INSERT INTO public.companies (name, cnpj, segment, plan)
-        VALUES ('Minha Empresa', '00.000.000/0001-00', 'Geral', 'pro')
-        RETURNING id INTO default_tenant_id;
-    END IF;
-
     user_full_name := COALESCE(
-        new.raw_user_meta_data->>'full_name',
-        new.raw_user_meta_data->>'name',
-        split_part(new.email, '@', 1)
+        NULLIF(new.raw_user_meta_data->>'full_name', ''),
+        NULLIF(new.raw_user_meta_data->>'name', ''),
+        split_part(COALESCE(new.email, ''), '@', 1),
+        'Usuário'
     );
+    company_name := COALESCE(NULLIF(new.raw_user_meta_data->>'company_name', ''), 'Minha Empresa');
+
+    INSERT INTO public.companies (user_id, name, email, phone, plan)
+    VALUES (new.id, company_name, COALESCE(new.email, ''), NULLIF(new.raw_user_meta_data->>'phone', ''), 'starter')
+    RETURNING id INTO new_tenant_id;
 
     INSERT INTO public.profiles (
         user_id,
@@ -78,7 +78,7 @@ BEGIN
         status
     ) VALUES (
         new.id,
-        default_tenant_id,
+        new_tenant_id,
         user_full_name,
         user_full_name,
         new.email,
@@ -87,6 +87,10 @@ BEGIN
         'Administrador',
         'ativo'
     ) ON CONFLICT (user_id, company_id) DO NOTHING;
+
+    INSERT INTO public.users (id, company_id, name, full_name, display_name, email, role, job_title, status)
+    VALUES (new.id, new_tenant_id, user_full_name, user_full_name, user_full_name, COALESCE(new.email, ''), 'admin', 'Administrador', 'ativo')
+    ON CONFLICT (id) DO UPDATE SET company_id = EXCLUDED.company_id;
 
     RETURN NEW;
 END;
@@ -104,7 +108,7 @@ CREATE TRIGGER set_companies_updated_at BEFORE UPDATE ON public.companies FOR EA
 
 -- Políticas RLS
 DROP POLICY IF EXISTS "tenant_isolation_companies" ON public.companies;
-CREATE POLICY "tenant_isolation_companies" ON public.companies FOR ALL USING (id = public.current_user_company_id() OR auth.role() = 'authenticated');
+CREATE POLICY "tenant_isolation_companies" ON public.companies FOR ALL USING (id = public.current_user_company_id()) WITH CHECK (id = public.current_user_company_id());
 
 DROP POLICY IF EXISTS "tenant_isolation_profiles" ON public.profiles;
 CREATE POLICY "tenant_isolation_profiles" ON public.profiles FOR ALL USING (user_id = auth.uid() OR company_id = public.current_user_company_id()) WITH CHECK (user_id = auth.uid() OR company_id = public.current_user_company_id());

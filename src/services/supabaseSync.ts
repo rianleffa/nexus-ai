@@ -52,6 +52,7 @@ class SupabaseSyncService {
     success: boolean;
     message: string;
     tablesFound?: string[];
+    tablesMissing?: string[];
     latencyMs?: number;
   }> {
     if (!isSupabaseConfigured || !supabase) {
@@ -63,26 +64,27 @@ class SupabaseSyncService {
 
     const start = performance.now();
     try {
-      // Test basic query to check access
-      const { data, error } = await supabase.from('clients').select('id').limit(1);
+      const requiredTables = ['clients', 'projects', 'tasks', 'calendar_events', 'financial_transactions', 'documents', 'document_categories', 'notifications'];
+      const probes = await Promise.all(requiredTables.map(async (table) => {
+        const { error } = await supabase!.from(table).select('id').limit(0);
+        return { table, error };
+      }));
       const latencyMs = Math.round(performance.now() - start);
-
-      if (error) {
-        return {
-          success: false,
-          message: `Erro na conexão com Supabase: ${error.message}`,
-          latencyMs,
-        };
-      }
-
-      this.setStatus('connected');
+      const tablesFound = probes.filter(({ error }) => !error).map(({ table }) => table);
+      const tablesMissing = probes.filter(({ error }) => !!error).map(({ table }) => table);
+      const success = tablesMissing.length === 0;
+      this.setStatus(success ? 'connected' : 'error');
       return {
-        success: true,
-        message: `Conexão estabelecida com sucesso via Supabase PostgreSQL (Latência: ${latencyMs}ms)`,
+        success,
+        message: success
+          ? `Conexão e tabelas verificadas via Supabase PostgreSQL (Latência: ${latencyMs}ms)`
+          : `Conexão parcial: não foi possível consultar ${tablesMissing.join(', ')}. Verifique o esquema e as políticas RLS.`,
         latencyMs,
-        tablesFound: ['clients', 'projects', 'tasks', 'calendar_events', 'financial_transactions', 'documents'],
+        tablesFound,
+        tablesMissing,
       };
     } catch (err: any) {
+      this.setStatus('error');
       return {
         success: false,
         message: `Falha ao alcançar o servidor Supabase: ${err.message || err}`,
@@ -328,11 +330,15 @@ class SupabaseSyncService {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       if (action === 'delete') {
-        await supabase.from('clients').delete().eq('id', client.id);
+        const { error } = await supabase.from('clients').delete().eq('id', client.id);
+        if (error) throw error;
       } else {
-        await supabase.from('clients').upsert({
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError || !authData.user) throw authError || new Error('Sessão do usuário não encontrada.');
+        const { error } = await supabase.from('clients').upsert({
           id: client.id,
           company_id: client.company_id,
+          user_id: authData.user.id,
           name: client.name,
           company_name: client.company_name,
           document: client.document,
@@ -345,8 +351,11 @@ class SupabaseSyncService {
           last_interaction: client.last_interaction || new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
+        if (error) throw error;
       }
+      this.setStatus('connected');
     } catch (err) {
+      this.setStatus('error');
       console.warn('[SupabaseSync] Erro ao sincronizar cliente:', err);
     }
   }
@@ -356,9 +365,10 @@ class SupabaseSyncService {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       if (action === 'delete') {
-        await supabase.from('projects').delete().eq('id', project.id);
+        const { error } = await supabase.from('projects').delete().eq('id', project.id);
+        if (error) throw error;
       } else {
-        await supabase.from('projects').upsert({
+        const { error } = await supabase.from('projects').upsert({
           id: project.id,
           company_id: project.company_id,
           client_id: project.client_id || null,
@@ -373,8 +383,11 @@ class SupabaseSyncService {
           due_date: project.due_date || null,
           updated_at: new Date().toISOString(),
         });
+        if (error) throw error;
       }
+      this.setStatus('connected');
     } catch (err) {
+      this.setStatus('error');
       console.warn('[SupabaseSync] Erro ao sincronizar projeto:', err);
     }
   }
@@ -384,9 +397,10 @@ class SupabaseSyncService {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       if (action === 'delete') {
-        await supabase.from('tasks').delete().eq('id', task.id);
+        const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+        if (error) throw error;
       } else {
-        await supabase.from('tasks').upsert({
+        const { error } = await supabase.from('tasks').upsert({
           id: task.id,
           company_id: task.company_id,
           project_id: task.project_id || null,
@@ -400,8 +414,11 @@ class SupabaseSyncService {
           tags: task.tags || [],
           updated_at: new Date().toISOString(),
         });
+        if (error) throw error;
       }
+      this.setStatus('connected');
     } catch (err) {
+      this.setStatus('error');
       console.warn('[SupabaseSync] Erro ao sincronizar tarefa:', err);
     }
   }
@@ -411,9 +428,10 @@ class SupabaseSyncService {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       if (action === 'delete') {
-        await supabase.from('calendar_events').delete().eq('id', event.id);
+        const { error } = await supabase.from('calendar_events').delete().eq('id', event.id);
+        if (error) throw error;
       } else {
-        await supabase.from('calendar_events').upsert({
+        const { error } = await supabase.from('calendar_events').upsert({
           id: event.id,
           company_id: event.company_id,
           client_id: event.client_id || null,
@@ -428,8 +446,11 @@ class SupabaseSyncService {
           status: event.status || 'agendado',
           updated_at: new Date().toISOString(),
         });
+        if (error) throw error;
       }
+      this.setStatus('connected');
     } catch (err) {
+      this.setStatus('error');
       console.warn('[SupabaseSync] Erro ao sincronizar evento da agenda:', err);
     }
   }
@@ -442,9 +463,10 @@ class SupabaseSyncService {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       if (action === 'delete') {
-        await supabase.from('financial_transactions').delete().eq('id', transaction.id);
+        const { error } = await supabase.from('financial_transactions').delete().eq('id', transaction.id);
+        if (error) throw error;
       } else {
-        await supabase.from('financial_transactions').upsert({
+        const { error } = await supabase.from('financial_transactions').upsert({
           id: transaction.id,
           company_id: transaction.company_id,
           client_id: transaction.client_id || null,
@@ -459,8 +481,11 @@ class SupabaseSyncService {
           notes: transaction.notes,
           updated_at: new Date().toISOString(),
         });
+        if (error) throw error;
       }
+      this.setStatus('connected');
     } catch (err) {
+      this.setStatus('error');
       console.warn('[SupabaseSync] Erro ao sincronizar transação financeira:', err);
     }
   }

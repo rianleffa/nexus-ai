@@ -232,8 +232,8 @@ BEGIN
   );
   company_name := COALESCE(NULLIF(NEW.raw_user_meta_data->>'company_name', ''), 'Minha Empresa');
 
-  INSERT INTO public.companies (name, email, phone, plan)
-  VALUES (company_name, NEW.email, NULLIF(NEW.raw_user_meta_data->>'phone', ''), 'starter')
+  INSERT INTO public.companies (user_id, name, email, phone, plan)
+  VALUES (NEW.id, company_name, NEW.email, NULLIF(NEW.raw_user_meta_data->>'phone', ''), 'starter')
   RETURNING id INTO new_company_id;
 
   INSERT INTO public.profiles (

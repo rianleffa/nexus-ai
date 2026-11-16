@@ -258,31 +258,6 @@ export interface ReportMetricsSummary {
 // AI & Function Calling Types
 // ------------------------------------------------------------------------------
 
-export interface AIToolParameter {
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  description?: string;
-  required?: boolean;
-  enum?: string[];
-}
-
-export interface AITool {
-  name: string;
-  description: string;
-  parameters: {
-    type: 'object';
-    properties: Record<string, AIToolParameter>;
-    required: string[];
-  };
-  requiresConfirmation?: boolean;
-  confirmationMessage?: (args: Record<string, any>) => string;
-  execute: (args: Record<string, any>, context: AIExecutionContext) => Promise<AIToolExecutionResult>;
-}
-
-export interface AIExecutionContext {
-  user: User;
-  company: Company;
-}
-
 export interface AIToolExecutionResult {
   success: boolean;
   data?: any;
@@ -318,6 +293,7 @@ export interface PendingConfirmation {
   toolName: string;
   parameters: Record<string, any>;
   message: string;
+  confirmationToken: string;
 }
 
 export interface ChatMessage {

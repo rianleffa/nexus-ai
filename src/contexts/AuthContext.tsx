@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, Company } from '../types';
 import { defaultUser, dataStore } from '../services/dataStore';
-import { AIService } from '../services/ai/aiService';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { supabaseSync } from '../services/supabaseSync';
 
@@ -217,7 +216,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user && company) {
       localStorage.setItem('nexus_auth_user', JSON.stringify(user));
       localStorage.setItem('nexus_auth_company', JSON.stringify(company));
-      AIService.setContext({ user, company });
     } else {
       localStorage.removeItem('nexus_auth_user');
       localStorage.removeItem('nexus_auth_company');

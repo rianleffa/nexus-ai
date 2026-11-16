@@ -6,6 +6,7 @@
 CREATE TABLE IF NOT EXISTS public.clients (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     company_name VARCHAR(255),
     document VARCHAR(50),

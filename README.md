@@ -82,11 +82,17 @@ No OAuth Client Web do Google, adicione os três endereços de origem acima sem 
 https://aztmenorefrgpdnpedjb.supabase.co/auth/v1/callback
 ```
 
-O ambiente local está conectado ao projeto `aztmenorefrgpdnpedjb` (`rianleffa's Project`). Esse banco já possui perfis e empresas vinculados por `user_id`; o login também aceita esse formato, buscando somente a empresa do usuário autenticado. O esquema completo do NEXUS usa `profiles.company_id` e tabelas adicionais. A compatibilidade de login não instala essas tabelas: revise uma migração específica antes de usar os demais módulos nesse banco existente. Preserve os gatilhos e as políticas do projeto durante essa revisão; não execute `schema.sql` nem substitua `handle_new_user` apenas para habilitar o login.
+O ambiente local está conectado ao projeto confirmado `aztmenorefrgpdnpedjb` (`rianleffa's Project`). O banco remoto mantém um esquema legado por proprietário (`profiles`, `companies` e `clients` com `user_id`), enquanto o NEXUS trabalha com `company_id` e outras tabelas. A migration `000_legacy_company_compatibility.sql` mapeia cada registro existente para sua única empresa correspondente, adicionando colunas sem remover os campos legados e abortando se encontrar vínculos ambíguos ou ausentes. Depois dela, aplique as migrations `001` a `010` pela sequência normal; não execute `schema.sql` sobre esse banco. O histórico de migrations remoto ainda não foi encontrado, então reconcilie o estado do CLI antes de qualquer `db push`.
 
 ### Assistente Gemini
 
-O segredo `GEMINI_API_KEY` é usado pela Edge Function em `supabase/functions/gemini`. Configure-o como segredo de servidor do Supabase Edge Functions; não use um nome com prefixo `VITE_`. O assistente depende de a função estar implantada e da chave configurada.
+O assistente usa `gemini-3.8-flash` pela API oficial do Google, exclusivamente na Edge Function `gemini`. Configure `GEMINI_API_KEY` em **Supabase Dashboard → Edge Functions → Secrets**. Nunca use prefixo `VITE_`, não coloque a chave em `.env` do frontend e não a versione. A chave que apareceu na conversa deve ser revogada no Google AI Studio e substituída por uma nova antes de habilitar o serviço.
+
+Para publicar, vincule a CLI ao projeto Supabase confirmado e execute `supabase functions deploy gemini --project-ref <PROJECT_REF>`. O gateway JWT permanece habilitado e o handler também valida cada token com `auth.getUser` antes de consultar ou alterar dados. Usa uma chave Supabase publishable (ou a anon legada) junto ao token do usuário para manter RLS. Leituras e gravações têm filtro explícito por empresa; mutações são registradas em `ai_action_logs` e exigem confirmação assinada com validade de cinco minutos. O perfil colaborador não pode lançar transações financeiras.
+
+O ambiente local pode usar `supabase functions serve gemini --env-file supabase/functions/.env`, com a chave preenchida apenas no arquivo ignorado pelo Git. A lista de origens CORS de produção e desenvolvimento está no início da função; atualize-a se o domínio oficial do NEXUS mudar.
+
+Antes de habilitar a função, confirme que as migrations aditivas criaram as tabelas e políticas RLS de `profiles`, `companies`, `clients`, `projects`, `tasks`, `calendar_events`, `financial_transactions` e `ai_action_logs`. O projeto configurado no checkout é `aztmenorefrgpdnpedjb`; a revisão remota confirmou que o esquema NEXUS ainda não está instalado. A migration de compatibilidade não remove linhas nem desativa RLS.
 
 Em produção, configure `VITE_SUPABASE_URL` e a chave pública `VITE_SUPABASE_PUBLISHABLE_KEY` no ambiente Production da Vercel e faça um novo deploy. Configure `GEMINI_API_KEY` como segredo das Edge Functions do Supabase; não armazene a chave Gemini em variáveis `VITE_` da Vercel.
 

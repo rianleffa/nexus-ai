@@ -31,7 +31,7 @@ export const Architecture: React.FC = () => {
   const aiFlow = [
     { id: 1, title: 'Usuário', desc: 'Comando em Linguagem Natural', icon: User, tag: 'Input' },
     { id: 2, title: 'NEXUS AI Assistant', desc: 'Camada de Orquestração e Contexto de Negócio', icon: Bot, tag: 'NLU' },
-    { id: 3, title: 'Google Gemini 2.5', desc: 'Extração Semântica e Function Calling via API Oficial / Edge Function', icon: Cpu, tag: 'Gemini' },
+    { id: 3, title: 'Google Gemini 3.8 Flash', desc: 'Linguagem natural e Function Calling seguro na Supabase Edge Function', icon: Cpu, tag: 'Gemini' },
     { id: 4, title: 'Function / Tool Calling', desc: 'Mapeamento para Ferramentas Registradas no ToolRegistry', icon: Layers, tag: 'Registry' },
     { id: 5, title: 'Barreira de Validação & Permissão', desc: 'Checagem de Parâmetros e Confirmação de Ações Sensíveis', icon: ShieldCheck, tag: 'Security' },
     { id: 6, title: 'Backend / Execução Segura', desc: 'Execução das Regras de Negócio e Auditoria em Log', icon: Server, tag: 'Execution' },

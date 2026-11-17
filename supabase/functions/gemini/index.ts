@@ -429,7 +429,9 @@ async function geminiCall(apiKey: string, contents: unknown[], systemInstruction
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST', signal,
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: systemInstruction }] }, tools: [{ functionDeclarations: declarations }], toolConfig: { functionCallingConfig: { mode: 'AUTO', allowedFunctionNames: toolNames } }, generationConfig: { maxOutputTokens: 1200 } }),
+    // In AUTO mode the model decides whether to answer or call a function.
+    // Gemini only accepts allowedFunctionNames with ANY or VALIDATED modes.
+    body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: systemInstruction }] }, tools: [{ functionDeclarations: declarations }], toolConfig: { functionCallingConfig: { mode: 'AUTO' } }, generationConfig: { maxOutputTokens: 1200 } }),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {

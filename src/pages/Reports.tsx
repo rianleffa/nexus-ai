@@ -276,7 +276,7 @@ export const Reports: React.FC = () => {
           { id: 'overview', label: 'Visão Geral & Lançamentos', icon: DollarSign },
           { id: 'clients', label: 'Carteira de Clientes', icon: Users },
           { id: 'tasks', label: 'Quadro de Tarefas & Prazos', icon: CheckCircle2 },
-          { id: 'projects', label: 'Projetos em Andamento', icon: Briefcase },
+          { id: 'projects', label: 'Operações em andamento', icon: Briefcase },
         ].map((tab) => {
           const Icon = tab.icon;
           const isSel = selectedReport === tab.id;
@@ -312,7 +312,7 @@ export const Reports: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              CNPJ: {company?.cnpj || '12.345.678/0001-90'} • Período: {reportData.startDate} até {reportData.endDate}
+              CNPJ: {company?.cnpj || 'Não informado'} • Período: {reportData.startDate} até {reportData.endDate}
             </p>
           </div>
 
@@ -396,7 +396,7 @@ export const Reports: React.FC = () => {
         {selectedReport === 'tasks' && (
           <div className="space-y-4">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Quadro de Entregas & Prazos ({tasks.length} tarefas)
+              Atividades e prazos ({tasks.length} tarefas)
             </h4>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -426,13 +426,13 @@ export const Reports: React.FC = () => {
         {selectedReport === 'projects' && (
           <div className="space-y-4">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Status de Projetos Estratégicos ({projects.length} projetos)
+              Acompanhamento das operações ({projects.length} registros)
             </h4>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-semibold uppercase text-[10px]">
                   <tr>
-                    <th className="p-2.5">Projeto</th>
+                    <th className="p-2.5">Operação</th>
                     <th className="p-2.5">Cliente</th>
                     <th className="p-2.5">Progresso</th>
                     <th className="p-2.5">Prazo</th>

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutDashboard,
   Users,
-  FolderKanban,
+  Workflow,
   CheckSquare,
   Calendar,
   DollarSign,
@@ -51,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { section: 'Menu Principal' },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'clients', label: 'Clientes', icon: Users },
-    { id: 'projects', label: 'Projetos', icon: FolderKanban },
+    { id: 'projects', label: 'Operações', icon: Workflow },
     { id: 'tasks', label: 'Tarefas', icon: CheckSquare },
     { id: 'calendar', label: 'Agenda', icon: Calendar },
     { id: 'finance', label: 'Financeiro', icon: DollarSign },

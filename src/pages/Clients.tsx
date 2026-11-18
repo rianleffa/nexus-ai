@@ -15,7 +15,7 @@ import {
   Edit2,
   Trash2,
   ExternalLink,
-  FolderKanban,
+  Workflow,
   CheckCircle2,
   TrendingUp,
   Clock,
@@ -263,12 +263,12 @@ export const Clients: React.FC<ClientsProps> = ({
             <Card className="space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <FolderKanban className="w-4 h-4 text-brand-500" />
-                  <span>Projetos em Andamento ({clientProjects.length})</span>
+                  <Workflow className="w-4 h-4 text-brand-500" />
+                  <span>Operações em andamento ({clientProjects.length})</span>
                 </h3>
               </div>
               {clientProjects.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Nenhum projeto cadastrado para este cliente.</p>
+                <p className="text-xs text-slate-400 py-4 text-center">Nenhuma operação vinculada a este cliente.</p>
               ) : (
                 <div className="space-y-2.5">
                   {clientProjects.map((p) => (
@@ -404,7 +404,7 @@ export const Clients: React.FC<ClientsProps> = ({
                 Clientes & CRM
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Centralize a carteira de contatos, contratos e projetos da sua empresa
+                Centralize seus contatos e acompanhe as operações da empresa
               </p>
             </div>
 

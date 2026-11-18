@@ -5,7 +5,7 @@ type AssistantResponse = {
   success: boolean;
   text?: string;
   error?: string;
-  status?: 'pending_confirmation' | 'success' | 'cancelled';
+  status?: 'pending_confirmation' | 'success' | 'cancelled' | 'needs_clarification';
   pendingConfirmation?: ChatMessage['pendingConfirmation'];
   toolCall?: {
     toolName: string;
@@ -19,7 +19,7 @@ const timestamp = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit'
 
 async function invokeAssistant(body: Record<string, unknown>): Promise<AssistantResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error('O assistente requer uma sessão Supabase configurada.');
-  const { data, error } = await supabase.functions.invoke('gemini', { body });
+  const { data, error } = await supabase.functions.invoke('gemini', { body, signal: AbortSignal.timeout(35_000) });
   if (error) {
     const context = (error as any).context;
     const details = context instanceof Response ? await context.clone().json().catch(() => null) : context;
@@ -42,6 +42,7 @@ export class AIService {
       : history;
     const response = await invokeAssistant({
       action: 'chat',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       message: text,
       history: priorHistory.slice(-12).map(({ sender, content }) => ({ sender, content })),
     });
@@ -64,6 +65,7 @@ export class AIService {
 
   public static async executeConfirmed(confirmationToken: string): Promise<{ message: string; result?: AIToolExecutionResult }> {
     const response = await invokeAssistant({ action: 'confirm', confirmationToken });
+    if (response.status === 'needs_clarification') throw new Error(response.text || 'A operação precisa de informações adicionais e não foi gravada.');
     if (!response.text) throw new Error('O servidor confirmou a ação, mas não retornou a mensagem de confirmação. Consulte os registros antes de tentar novamente.');
     return { message: response.text, result: response.toolCall?.result };
   }

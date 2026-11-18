@@ -1,26 +1,29 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
-import { Layout } from './components/layout/Layout';
+const Layout = lazy(() => import('./components/layout/Layout').then((module) => ({ default: module.Layout })));
+const Login = lazy(() => import('./pages/Login').then((module) => ({ default: module.Login })));
+const Register = lazy(() => import('./pages/Register').then((module) => ({ default: module.Register })));
+const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
+const Clients = lazy(() => import('./pages/Clients').then((module) => ({ default: module.Clients })));
+const Projects = lazy(() => import('./pages/Projects').then((module) => ({ default: module.Projects })));
+const Tasks = lazy(() => import('./pages/Tasks').then((module) => ({ default: module.Tasks })));
+const Calendar = lazy(() => import('./pages/Calendar').then((module) => ({ default: module.Calendar })));
+const Financial = lazy(() => import('./pages/Financial').then((module) => ({ default: module.Financial })));
+const Documents = lazy(() => import('./pages/Documents').then((module) => ({ default: module.Documents })));
+const AIAssistant = lazy(() => import('./pages/AIAssistant').then((module) => ({ default: module.AIAssistant })));
+const Reports = lazy(() => import('./pages/Reports').then((module) => ({ default: module.Reports })));
+const Architecture = lazy(() => import('./pages/Architecture').then((module) => ({ default: module.Architecture })));
+const Settings = lazy(() => import('./pages/Settings').then((module) => ({ default: module.Settings })));
+const PasswordRecovery = lazy(() => import('./pages/PasswordRecovery').then((module) => ({ default: module.PasswordRecovery })));
+const LandingPage = lazy(() => import('./pages/LandingPage').then((module) => ({ default: module.LandingPage })));
 
-// Pages
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
-import { Dashboard } from './pages/Dashboard';
-import { Clients } from './pages/Clients';
-import { Projects } from './pages/Projects';
-import { Tasks } from './pages/Tasks';
-import { Calendar } from './pages/Calendar';
-import { Financial } from './pages/Financial';
-import { Documents } from './pages/Documents';
-import { AIAssistant } from './pages/AIAssistant';
-import { Reports } from './pages/Reports';
-import { Architecture } from './pages/Architecture';
-import { Settings } from './pages/Settings';
-import { PasswordRecovery } from './pages/PasswordRecovery';
-
-import { LandingPage } from './pages/LandingPage';
+const PageLoading = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700" role="status" aria-live="polite">
+    Carregando página…
+  </div>
+);
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -29,13 +32,16 @@ const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<string>('dashboard');
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string | undefined>(undefined);
   const [navParams, setNavParams] = useState<Record<string, any> | undefined>(undefined);
-  const isPasswordRecovery = new URLSearchParams(window.location.search).get('auth') === 'recovery';
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(() =>
+    new URLSearchParams(window.location.search).get('auth') === 'recovery'
+  );
 
   const returnToLogin = () => {
     const query = new URLSearchParams(window.location.search);
     query.delete('auth');
     const nextUrl = `${window.location.pathname}${query.size ? `?${query}` : ''}`;
     window.history.replaceState(window.history.state, '', nextUrl);
+    setIsPasswordRecovery(false);
     setAuthView('login');
   };
 
@@ -78,38 +84,45 @@ const AppContent: React.FC = () => {
   }
 
   if (isPasswordRecovery) {
-    return <PasswordRecovery onBackToLogin={returnToLogin} />;
+    return <Suspense fallback={<PageLoading />}><PasswordRecovery onBackToLogin={returnToLogin} /></Suspense>;
   }
 
   // If not authenticated, render LandingPage, Login or Register
   if (!isAuthenticated) {
     if (authView === 'landing') {
       return (
+        <Suspense fallback={<PageLoading />}>
         <LandingPage
           onLoginClick={() => setAuthView('login')}
           onRegisterClick={() => setAuthView('register')}
         />
+        </Suspense>
       );
     }
     if (authView === 'register') {
       return (
+        <Suspense fallback={<PageLoading />}>
         <Register
           onNavigateToLogin={() => setAuthView('login')}
           onSuccess={() => setCurrentPage('dashboard')}
         />
+        </Suspense>
       );
     }
     return (
+      <Suspense fallback={<PageLoading />}>
       <Login
         onNavigateToRegister={() => setAuthView('register')}
         onNavigateToLanding={() => setAuthView('landing')}
         onSuccess={() => setCurrentPage('dashboard')}
       />
+      </Suspense>
     );
   }
 
   // Render main application layout
   return (
+    <Suspense fallback={<PageLoading />}>
     <Layout currentPage={currentPage} onNavigate={navigateTo}>
       {currentPage === 'dashboard' && (
         <Dashboard
@@ -152,6 +165,7 @@ const AppContent: React.FC = () => {
       {currentPage === 'architecture' && <Architecture />}
       {currentPage === 'settings' && <Settings />}
     </Layout>
+    </Suspense>
   );
 };
 

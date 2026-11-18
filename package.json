@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --test supabase/functions/gemini/validation.test.mjs",
+    "test": "node --test supabase/functions/gemini/validation.test.mjs supabase/functions/gemini/backend.test.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -32,7 +32,7 @@ export const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({ onBackToLogi
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4">
+    <main id="main-content" className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4">
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl">
         <div className="text-center space-y-2 mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-brand-600 text-white mb-2">
@@ -90,6 +90,6 @@ export const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({ onBackToLogi
           </form>
         )}
       </div>
-    </div>
+    </main>
   );
 };

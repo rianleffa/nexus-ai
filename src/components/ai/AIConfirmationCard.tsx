@@ -7,14 +7,16 @@ interface AIConfirmationCardProps {
   toolName: string;
   parameters: Record<string, any>;
   message: string;
+  disabled?: boolean;
   onConfirm: () => Promise<void>;
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
 }
 
 export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
   toolName,
   parameters,
   message,
+  disabled = false,
   onConfirm,
   onCancel,
 }) => {
@@ -22,6 +24,7 @@ export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
   const [isResolved, setIsResolved] = useState<'confirmed' | 'cancelled' | null>(null);
 
   const handleConfirm = async () => {
+    if (isLoading || disabled) return;
     setIsLoading(true);
     try {
       await onConfirm();
@@ -33,9 +36,17 @@ export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
     }
   };
 
-  const handleCancel = () => {
-    setIsResolved('cancelled');
-    onCancel();
+  const handleCancel = async () => {
+    if (isLoading || disabled) return;
+    setIsLoading(true);
+    try {
+      await onCancel();
+      setIsResolved('cancelled');
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isResolved === 'confirmed') {
@@ -70,19 +81,20 @@ export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
         </div>
       </div>
 
-      <div className="bg-white/60 dark:bg-slate-900/60 p-2.5 rounded-lg border border-amber-200 dark:border-amber-900/50 font-mono text-[11px] text-slate-600 dark:text-slate-400">
-        <div className="font-semibold text-slate-700 dark:text-slate-300 mb-1">
-          Ação pendente: <span className="text-amber-600 dark:text-amber-400">{toolName}</span>
+      <details className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-white/60 dark:bg-slate-900/60">
+        <summary className="cursor-pointer px-2.5 py-2 text-slate-600 dark:text-slate-400">Ver detalhes</summary>
+        <div className="border-t border-amber-200 dark:border-amber-900/50 p-2.5 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+          <div className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Ação: {toolName}</div>
+          <div>Parâmetros: {JSON.stringify(parameters)}</div>
         </div>
-        <div>Parâmetros validados: {JSON.stringify(parameters)}</div>
-      </div>
+      </details>
 
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button
           variant="outline"
           size="sm"
           onClick={handleCancel}
-          disabled={isLoading}
+          disabled={isLoading || disabled}
           leftIcon={<X className="w-3.5 h-3.5" />}
         >
           Cancelar
@@ -92,10 +104,11 @@ export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
           size="sm"
           onClick={handleConfirm}
           isLoading={isLoading}
+          disabled={disabled}
           leftIcon={<Check className="w-3.5 h-3.5" />}
           className="bg-amber-600 hover:bg-amber-700 text-white focus:ring-amber-500"
         >
-          Confirmar Lançamento
+          Confirmar ação
         </Button>
       </div>
     </div>

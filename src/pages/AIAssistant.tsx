@@ -22,6 +22,8 @@ import { ChatMessage } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { isSupabaseConfigured } from '../services/supabase';
+import { supabaseSync } from '../services/supabaseSync';
+import { dataStore } from '../services/dataStore';
 
 interface AIAssistantProps {
   initialPrompt?: string;
@@ -36,18 +38,31 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
   const { showToast } = useNotification();
   const [inputPrompt, setInputPrompt] = useState(initialPrompt || '');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeAction, setActiveAction] = useState<string | null>(null);
+  const busyRef = useRef(false);
+  const conversationKey = `nexus_chat:${company?.id}:${user?.id}`;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(conversationKey) || 'null');
+      if (Array.isArray(saved) && saved.length) return saved.filter(m => ['user','assistant'].includes(m.sender)).slice(-40);
+    } catch {}
+    return [
     {
       id: 'seed-01',
       sender: 'assistant',
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       content:
         `Olá, **${user?.name.split(' ')[0] || 'bem-vindo(a)'}**! Sou o gestor virtual do **NEXUS AI** para **${company?.name || 'sua empresa'}**.\n\n` +
-        `Posso consultar informações autorizadas da empresa e preparar ações nos módulos. Você confirma antes de qualquer alteração ser gravada.`,
+        `Posso consultar e atualizar informações da empresa, além de executar cadastros e alterações simples pelo chat. Para exclusões, operações financeiras e outras ações sensíveis, vou pedir sua confirmação.`,
     },
-  ]);
+    ];
+  });
+
+  useEffect(() => {
+    try { sessionStorage.setItem(conversationKey, JSON.stringify(messages.slice(-40))); } catch {}
+  }, [conversationKey, messages]);
 
   // If navigated with an initial prompt, fill it in
   useEffect(() => {
@@ -63,7 +78,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = customText || inputPrompt;
-    if (!textToSend.trim() || isLoading) return;
+    if (!textToSend.trim() || busyRef.current) return;
+    busyRef.current = true;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -96,16 +112,20 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         {
           id: `err-${Date.now()}`,
           sender: 'assistant',
-          content: `Falha no processamento da solicitação: ${err?.message || 'Erro inesperado'}`,
+          content: err?.message || 'Não foi possível concluir a solicitação. Nenhuma nova ação foi confirmada.',
           timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
     } finally {
+      busyRef.current = false;
       setIsLoading(false);
     }
   };
 
   const handleConfirmAction = async (confId: string, toolName: string, parameters: Record<string, any>) => {
+    if (busyRef.current) throw new Error('Aguarde a operação em andamento.');
+    busyRef.current = true;
+    setActiveAction(confId);
     try {
       const pending = messages.find((msg) => msg.pendingConfirmation?.id === confId)?.pendingConfirmation;
       if (!pending?.confirmationToken) throw new Error('Confirmação inválida ou expirada. Envie a solicitação novamente.');
@@ -118,6 +138,12 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       });
 
       showToast('Ação confirmada e gravada no Supabase.', 'success');
+      try {
+        const remoteData = await supabaseSync.fetchRemoteData(company?.id);
+        if (remoteData) dataStore.syncFromRemote(remoteData);
+      } catch {
+        showToast('A ação foi gravada. Atualize a página para recarregar os dados.', 'warning');
+      }
 
       // Update the message in chat
       setMessages((prev) =>
@@ -148,7 +174,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
         ? {
             ...msg,
-            content: `A operação não foi confirmada pelo Supabase: ${e?.message || 'erro inesperado'}`,
+            content: `Não foi possível confirmar a operação: ${e?.message || 'erro inesperado'}. Consulte os registros antes de tentar novamente.`,
+            // The server consumes confirmation tokens before executing the write.
+            // Do not leave a retry button that could replay a partially completed request.
             pendingConfirmation: undefined,
             toolCall: {
               toolName,
@@ -161,12 +189,19 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
             },
           }
         : msg));
+      throw e;
+    } finally {
+      busyRef.current = false;
+      setActiveAction(null);
     }
   };
 
   const handleCancelAction = async (confId: string) => {
     const pending = messages.find((msg) => msg.pendingConfirmation?.id === confId)?.pendingConfirmation;
-    if (!pending?.confirmationToken) return;
+    if (!pending?.confirmationToken) throw new Error('Confirmação indisponível.');
+    if (busyRef.current) throw new Error('Aguarde a operação em andamento.');
+    busyRef.current = true;
+    setActiveAction(confId);
     try {
       await AIService.cancelConfirmation(pending.confirmationToken);
       setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
@@ -177,10 +212,15 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
         ? { ...msg, content: `Não foi possível confirmar o cancelamento: ${error?.message || 'erro inesperado'}. Nenhuma alteração de negócio foi executada.`, pendingConfirmation: undefined, toolCall: { toolName: pending.toolName, parameters: pending.parameters, steps: [{ label: 'Cancelamento no servidor', status: 'error' }], status: 'error' } }
         : msg));
+      throw error;
+    } finally {
+      busyRef.current = false;
+      setActiveAction(null);
     }
   };
 
   const handleClearConversation = async () => {
+    if (busyRef.current) return;
     const pending = messages.flatMap((msg) => msg.pendingConfirmation ? [msg.pendingConfirmation] : []);
     try {
       await Promise.all(pending.map((item) => AIService.cancelConfirmation(item.confirmationToken)));
@@ -224,7 +264,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
               <span>NEXUS AI</span>
             </h1>
             <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
-              Gemini 3.8 Flash • Function Calling
+              Google Gemini • Function Calling
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -245,6 +285,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => void handleClearConversation()}
+            disabled={isLoading || Boolean(activeAction)}
             leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
           >
             Limpar
@@ -321,7 +362,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
                       msg.pendingConfirmation!.parameters
                     )
                   }
-                  onCancel={() => void handleCancelAction(msg.pendingConfirmation!.id)}
+                  disabled={isLoading || Boolean(activeAction)}
+                  onCancel={() => handleCancelAction(msg.pendingConfirmation!.id)}
                 />
               )}
             </div>
@@ -358,6 +400,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
             <button
               key={i}
               onClick={() => handleSendMessage(item.prompt)}
+              disabled={isLoading || Boolean(activeAction)}
               className="shrink-0 bg-slate-100 dark:bg-slate-800/80 hover:bg-brand-500/10 hover:border-brand-500/30 hover:text-brand-600 dark:hover:text-brand-400 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl text-slate-600 dark:text-slate-300 transition-colors"
             >
               {item.label}
@@ -370,6 +413,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       <div className="relative">
         <textarea
           rows={2}
+          disabled={isLoading || Boolean(activeAction)}
           value={inputPrompt}
           onChange={(e) => setInputPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -388,7 +432,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
             size="sm"
             onClick={() => handleSendMessage()}
             isLoading={isLoading}
-            disabled={!inputPrompt.trim()}
+            disabled={!inputPrompt.trim() || Boolean(activeAction)}
             rightIcon={<Send className="w-3.5 h-3.5" />}
             className="shadow-glow"
           >

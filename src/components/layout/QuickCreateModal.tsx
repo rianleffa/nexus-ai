@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import {
   Users,
-  FolderKanban,
+  Workflow,
   CheckSquare,
   Calendar,
   TrendingUp,
@@ -130,7 +130,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     const p = dataStore.createProject({
       name: projName,
       client_id: client?.id,
-      client_name: client?.name || 'Projeto interno',
+      client_name: client?.name || 'Operação interna',
       lead_user_id: user?.id,
       budget: projectBudget,
       due_date: projDueDate,
@@ -139,7 +139,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       progress: 0,
       status: 'em_andamento',
     });
-    showToast(`Projeto "${p.name}" criado com sucesso!`, 'success');
+    showToast(`Operação "${p.name}" criada com sucesso!`, 'success');
     setProjName('');
     setProjBudget('');
     setProjDescription('');
@@ -253,7 +253,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
 
   const tabs: { id: QuickCreateTab; label: string; icon: React.ReactNode }[] = [
     { id: 'client', label: 'Cliente', icon: <Users className="w-3.5 h-3.5" /> },
-    { id: 'project', label: 'Projeto', icon: <FolderKanban className="w-3.5 h-3.5" /> },
+    { id: 'project', label: 'Operação', icon: <Workflow className="w-3.5 h-3.5" /> },
     { id: 'task', label: 'Tarefa', icon: <CheckSquare className="w-3.5 h-3.5" /> },
     { id: 'event', label: 'Agenda', icon: <Calendar className="w-3.5 h-3.5" /> },
     { id: 'revenue', label: 'Receita', icon: <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> },
@@ -299,7 +299,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
             <Input label="Telefone / WhatsApp" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="(11) 98765-4321" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="CPF ou CNPJ" value={clientDoc} onChange={(e) => setClientDoc(e.target.value)} placeholder="12.345.678/0001-90" />
+            <Input label="CPF ou CNPJ" value={clientDoc} onChange={(e) => setClientDoc(e.target.value)} placeholder="Informe o CPF ou CNPJ" />
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Status Inicial</label>
               <select
@@ -321,10 +321,10 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
         </form>
       )}
 
-      {/* 2. NOVO PROJETO */}
+      {/* 2. NOVA OPERAÇÃO */}
       {activeTab === 'project' && (
         <form onSubmit={handleCreateProject} className="space-y-3.5">
-          <Input label="Nome do Projeto *" required value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="Ex: Sistema ERP Financeiro" />
+          <Input label="Nome da operação *" required value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="Ex: Expansão da capacidade de atendimento" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Cliente Vinculado</label>
@@ -341,7 +341,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                 ))}
               </select>
             </div>
-            <Input label="Orçamento Estimado (R$)" type="number" step="0.01" min="0" value={projBudget} onChange={(e) => setProjBudget(e.target.value)} placeholder="0,00" />
+            <Input label="Recursos previstos (R$)" type="number" step="0.01" min="0" value={projBudget} onChange={(e) => setProjBudget(e.target.value)} placeholder="0,00" />
           </div>
           <Input label="Prazo Final de Entrega *" type="date" required value={projDueDate} onChange={(e) => setProjDueDate(e.target.value)} />
           <div>
@@ -350,13 +350,13 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
               rows={2}
               value={projDescription}
               onChange={(e) => setProjDescription(e.target.value)}
-              placeholder="Objetivos e principais entregas do projeto..."
+              placeholder="Objetivos, atividades e resultados esperados..."
               className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-3 text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500 focus:outline-none"
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-            <Button variant="primary" type="submit">Criar Projeto</Button>
+            <Button variant="primary" type="submit">Criar operação</Button>
           </div>
         </form>
       )}
@@ -380,7 +380,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Projeto Vinculado</label>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Operação vinculada</label>
               <select
                 value={taskProjectId}
                 onChange={(e) => {
@@ -391,7 +391,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                 }}
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
               >
-                <option value="">Nenhum projeto (Geral)</option>
+                <option value="">Nenhuma operação (geral)</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}

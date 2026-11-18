@@ -109,7 +109,7 @@ export const Tasks: React.FC<TasksProps> = ({
             Tarefas & Atividades
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Gerenciamento conectado de entregas com vínculos diretos a Clientes e Projetos
+            Gerencie atividades vinculadas a clientes e operações
           </p>
         </div>
 
@@ -149,7 +149,7 @@ export const Tasks: React.FC<TasksProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar por título, projeto ou cliente..."
+            placeholder="Buscar por título, operação ou cliente..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -298,7 +298,7 @@ export const Tasks: React.FC<TasksProps> = ({
                 <tr>
                   <th className="px-5 py-3.5 w-10"></th>
                   <th className="px-5 py-3.5">Título da Tarefa</th>
-                  <th className="px-5 py-3.5">Projeto / Cliente</th>
+                  <th className="px-5 py-3.5">Operação / Cliente</th>
                   <th className="px-5 py-3.5">Prioridade</th>
                   <th className="px-5 py-3.5">Prazo</th>
                   <th className="px-5 py-3.5">Status</th>

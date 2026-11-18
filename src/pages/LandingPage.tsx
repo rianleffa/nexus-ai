@@ -65,6 +65,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
         </div>
       </header>
 
+      <main id="main-content">
       {/* HERO SECTION */}
       <section className="relative pt-20 pb-28 px-4 sm:px-6 lg:px-8 text-center max-w-5xl mx-auto space-y-8">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold">
@@ -109,7 +110,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-600">
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Dashboard</span>
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Clientes e CRM</span>
-              <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Projetos e tarefas</span>
+              <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Operações e tarefas</span>
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Agenda</span>
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Financeiro</span>
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Relatórios</span>
@@ -181,7 +182,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
             </div>
             <h4 className="text-base font-bold text-slate-900">CRM & Gestão de Clientes</h4>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Cadastro de contatos e situação comercial, com tarefas, projetos, agenda e movimentações financeiras vinculadas.
+              Cadastro de contatos e situação comercial, com operações, tarefas, agenda e movimentações financeiras vinculadas.
             </p>
           </div>
 
@@ -214,7 +215,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
         <div className="grid gap-4 text-sm">
           <article className="rounded-2xl bg-white border border-slate-200 p-5">
             <h4 className="font-bold text-slate-900">O que posso gerenciar?</h4>
-            <p className="mt-2 text-slate-400">Clientes, projetos, tarefas, agenda, lançamentos financeiros, documentos e relatórios em um só espaço.</p>
+            <p className="mt-2 text-slate-400">Clientes, operações, tarefas, agenda, lançamentos financeiros, documentos e relatórios em um só espaço.</p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 p-5">
             <h4 className="font-bold text-slate-900">O assistente de IA já está disponível?</h4>
@@ -263,6 +264,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
           </div>
         </div>
       </section>
+      </main>
 
       {/* FOOTER */}
       <footer className="py-8 border-t border-slate-900 text-center text-xs text-slate-400 space-y-2">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Users, CheckSquare, Calendar, DollarSign, ArrowRight, FolderKanban } from 'lucide-react';
+import { Search, X, Users, CheckSquare, Calendar, DollarSign, ArrowRight, Workflow } from 'lucide-react';
 import { dataStore } from '../../services/dataStore';
 
 interface CommandSearchModalProps {
@@ -55,7 +55,7 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
             <input
               type="text"
               autoFocus
-              placeholder="Buscar clientes, tarefas, projetos ou compromissos..."
+              placeholder="Buscar clientes, tarefas, operações ou compromissos..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full bg-transparent border-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none text-sm"
@@ -144,7 +144,7 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
             {projects.length > 0 && (
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-2 mb-1.5 flex items-center gap-1.5">
-                  <FolderKanban className="w-3.5 h-3.5" /> Projetos ({projects.length})
+                  <Workflow className="w-3.5 h-3.5" /> Operações ({projects.length})
                 </div>
                 <div className="space-y-1">
                   {projects.slice(0, 3).map((p) => (

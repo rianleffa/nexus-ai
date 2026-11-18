@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  FolderKanban,
   Calendar,
   DollarSign,
   Users,
@@ -78,7 +77,7 @@ export const Projects: React.FC<ProjectsProps> = ({
   return (
     <div className="space-y-6">
       {selectedProject ? (
-        /* VISÃO 360° DO PROJETO */
+        /* Visão geral da operação */
         <div className="space-y-6 animate-in fade-in duration-150">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <button
@@ -86,7 +85,7 @@ export const Projects: React.FC<ProjectsProps> = ({
               className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Voltar para todos os projetos</span>
+              <span>Voltar para todas as operações</span>
             </button>
             <div className="flex items-center gap-2">
               <ProjectStatusBadge status={selectedProject.status} />
@@ -106,12 +105,12 @@ export const Projects: React.FC<ProjectsProps> = ({
                       onClick={() => onNavigate('clients', undefined, { clientId: selectedProject.client_id })}
                       className="font-bold text-brand-600 dark:text-brand-400 hover:underline inline-flex items-center gap-1"
                     >
-                      <span>{selectedProject.client_name || 'Projeto interno'}</span>
+                      <span>{selectedProject.client_name || 'Operação interna'}</span>
                       <ExternalLink className="w-3 h-3" />
                     </button>
                   ) : (
                     <span className="font-bold text-slate-700 dark:text-slate-300">
-                      {selectedProject.client_name || 'Projeto interno'}
+                      {selectedProject.client_name || 'Operação interna'}
                     </span>
                   )}
                   {' • '}Início: {selectedProject.start_date} • Prazo final: {selectedProject.due_date}
@@ -119,8 +118,8 @@ export const Projects: React.FC<ProjectsProps> = ({
               </div>
 
               <div className="text-right">
-                <span className="text-[10px] text-slate-400 uppercase block font-bold tracking-wider">
-                  Orçamento Previsto
+                  <span className="text-[10px] text-slate-400 uppercase block font-bold tracking-wider">
+                  Recursos previstos
                 </span>
                 <span className="text-xl font-extrabold text-slate-900 dark:text-white">
                   R$ {selectedProject.budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -135,7 +134,7 @@ export const Projects: React.FC<ProjectsProps> = ({
             {/* Progress Bar */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-semibold">
-                <span className="text-slate-700 dark:text-slate-300">Progresso Geral das Entregas</span>
+                <span className="text-slate-700 dark:text-slate-300">Progresso da operação</span>
                 <span className="text-brand-600 dark:text-brand-400 font-bold">{selectedProject.progress}%</span>
               </div>
               <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -154,12 +153,12 @@ export const Projects: React.FC<ProjectsProps> = ({
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <CheckSquare className="w-4 h-4 text-brand-500" />
-                  <span>Tarefas do Projeto ({projectTasks.length})</span>
+                  <span>Tarefas da operação ({projectTasks.length})</span>
                 </h3>
               </div>
 
               {projectTasks.length === 0 ? (
-                <p className="text-xs text-slate-400 py-6 text-center">Nenhuma tarefa cadastrada para este projeto.</p>
+                <p className="text-xs text-slate-400 py-6 text-center">Nenhuma tarefa vinculada a esta operação.</p>
               ) : (
                 <div className="space-y-2">
                   {projectTasks.map((t) => (
@@ -183,12 +182,12 @@ export const Projects: React.FC<ProjectsProps> = ({
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-brand-500" />
-                  <span>Reuniões & Alinhamentos ({projectEvents.length})</span>
+                  <span>Compromissos vinculados ({projectEvents.length})</span>
                 </h3>
               </div>
 
               {projectEvents.length === 0 ? (
-                <p className="text-xs text-slate-400 py-6 text-center">Nenhum compromisso agendado para este projeto.</p>
+                <p className="text-xs text-slate-400 py-6 text-center">Nenhum compromisso vinculado a esta operação.</p>
               ) : (
                 <div className="space-y-2">
                   {projectEvents.map((e) => (
@@ -211,10 +210,10 @@ export const Projects: React.FC<ProjectsProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Projetos & Entregas
+                Gestão de Operações
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Acompanhe o andamento de contratos, orçamentos e marcos operacionais
+                Organize iniciativas, rotinas, prazos e recursos de qualquer área da empresa
               </p>
             </div>
 
@@ -252,7 +251,7 @@ export const Projects: React.FC<ProjectsProps> = ({
                       {project.name}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {project.client_name || 'Projeto interno'}
+                      {project.client_name || 'Operação interna'}
                     </p>
                   </div>
                   <ProjectStatusBadge status={project.status} />
@@ -281,7 +280,7 @@ export const Projects: React.FC<ProjectsProps> = ({
                     <Calendar className="w-3.5 h-3.5" /> Prazo: {project.due_date}
                   </span>
                   <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    R$ {project.budget.toLocaleString('pt-BR')}
+                    Recursos: R$ {project.budget.toLocaleString('pt-BR')}
                   </span>
                 </div>
               </Card>

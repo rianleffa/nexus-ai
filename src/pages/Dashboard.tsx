@@ -14,7 +14,7 @@ import {
   CalendarDays,
   Plus,
   Building2,
-  FolderKanban,
+  Workflow,
   FileText,
   DollarSign,
   AlertCircle,
@@ -212,11 +212,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           onClick={() => onNavigate('tasks')}
         />
         <MetricCard
-          title="Projetos em Andamento"
+          title="Operações em andamento"
           value={activeProjects}
-          subtitle={`${projects.length} projeto(s) no total`}
+          subtitle={`${projects.length} operação(ões) no total`}
           trend="neutral"
-          icon={<FolderKanban className="w-5 h-5" />}
+          icon={<Workflow className="w-5 h-5" />}
           iconBg="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
           onClick={() => onNavigate('projects')}
         />
@@ -478,15 +478,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>}
 
-      {/* LINHA 2: PROJETOS EM ANDAMENTO & FLUXO FINANCEIRO */}
+      {/* LINHA 2: OPERAÇÕES EM ANDAMENTO & FLUXO FINANCEIRO */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Projetos em Andamento (1 Coluna) */}
+        {/* Operações em andamento (1 Coluna) */}
         <Card className="space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <FolderKanban className="w-4 h-4 text-brand-500" />
-                <span>Projetos em Andamento</span>
+                <Workflow className="w-4 h-4 text-brand-500" />
+                <span>Operações em andamento</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Acompanhe o progresso das entregas
@@ -503,8 +503,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-3">
             {projects.length === 0 ? (
               <div className="py-6 text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum projeto cadastrado.</p>
-                <Button className="mt-3" size="sm" variant="outline" onClick={() => onNavigate('projects')}>Criar primeiro projeto</Button>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Nenhuma operação cadastrada.</p>
+                <Button className="mt-3" size="sm" variant="outline" onClick={() => onNavigate('projects')}>Criar primeira operação</Button>
               </div>
             ) : projects.slice(0, 3).map((proj) => (
               <div

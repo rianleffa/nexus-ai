@@ -1,18 +1,18 @@
 # NEXUS AI
 
-Plataforma web de gestão empresarial para organizar clientes, projetos, tarefas, agenda, finanças e documentos em um único espaço. O assistente de IA pode interpretar solicitações e acionar ferramentas do sistema quando a Supabase Edge Function estiver configurada.
+Plataforma web de gestão empresarial para organizar clientes, operações, tarefas, agenda, finanças e documentos em um único espaço. O assistente de IA pode interpretar solicitações e acionar ferramentas do sistema quando a Supabase Edge Function estiver configurada.
 
 ## Funcionalidades
 
 - Dashboard com indicadores calculados a partir dos registros disponíveis.
 - CRM com cadastro, edição, situação e visão relacionada do cliente.
-- Projetos, tarefas com prioridade e prazo, e compromissos de agenda.
+- Operações, tarefas com prioridade e prazo, e compromissos de agenda.
 - Lançamentos de receita e despesa, distinguindo valores pagos e pendentes.
 - Relatórios com filtros, exportação CSV e impressão pelo navegador.
 - Upload, visualização e download de documentos usando Supabase Storage quando conectado.
 - Login por e-mail e senha, cadastro e Google OAuth via Supabase Auth.
 - Tema claro/escuro com preferência salva no navegador.
-- Modo de demonstração local quando o Supabase não está configurado. Os registros de demonstração são fictícios e locais.
+- Modo de demonstração local quando o Supabase não está configurado. A demonstração começa vazia e mantém os registros criados apenas no navegador.
 
 ## Tecnologias
 
@@ -86,7 +86,7 @@ O ambiente local está conectado ao projeto confirmado `aztmenorefrgpdnpedjb` (`
 
 ### Assistente Gemini
 
-O assistente usa `gemini-3.8-flash` pela API oficial do Google, exclusivamente na Edge Function `gemini`. Configure `GEMINI_API_KEY` em **Supabase Dashboard → Edge Functions → Secrets**. Nunca use prefixo `VITE_`, não coloque a chave em `.env` do frontend e não a versione. A chave que apareceu na conversa deve ser revogada no Google AI Studio e substituída por uma nova antes de habilitar o serviço.
+O assistente usa `gemini-3.5-flash-lite` por padrão (configurável pelo segredo `GEMINI_MODEL` no backend), validado com geração real e function calling pela API oficial do Google, exclusivamente na Edge Function `gemini`. Configure `GEMINI_API_KEY` em **Supabase Dashboard → Edge Functions → Secrets**. Nunca use prefixo `VITE_`, não coloque a chave em `.env` do frontend e não a versione. A chave que apareceu na conversa deve ser revogada no Google AI Studio e substituída por uma nova antes de habilitar o serviço.
 
 Para publicar, vincule a CLI ao projeto Supabase confirmado e execute `supabase functions deploy gemini --project-ref <PROJECT_REF>`. O gateway JWT permanece habilitado e o handler também valida cada token com `auth.getUser` antes de consultar ou alterar dados. Usa uma chave Supabase publishable (ou a anon legada) junto ao token do usuário para manter RLS. Leituras e gravações têm filtro explícito por empresa; mutações são registradas em `ai_action_logs` e exigem confirmação assinada com validade de cinco minutos. O perfil colaborador não pode lançar transações financeiras.
 
@@ -109,9 +109,10 @@ Escolha o procedimento adequado ao estado do seu banco; não execute o schema co
 ```bash
 npm run build
 npm run lint
+npm test
 ```
 
-`npm run build` executa `tsc -b` e a compilação de produção do Vite. `npm run lint` executa Oxlint. O `package.json` ainda não define script automatizado de testes.
+`npm run build` executa `tsc -b` e a compilação de produção do Vite. `npm run lint` executa Oxlint. `npm test` verifica datas, identificação de chave inválida e novas tentativas limitadas para falhas temporárias do Gemini.
 
 Para visualizar o build localmente:
 
@@ -124,3 +125,15 @@ npm run preview
 As permissões de dados empresariais dependem das políticas RLS e das migrations aplicadas no projeto Supabase remoto. A presença de uma policy ou migration neste repositório não significa que ela já esteja ativa no banco. Audite usuários e empresas existentes antes de ativar a migration de isolamento multiempresa.
 
 Não versione `.env`, credenciais, tokens, chaves privadas ou segredos de serviço. Use secrets do Supabase para valores usados por Edge Functions e as configurações protegidas do provedor para credenciais Google OAuth.
+
+### Agendamentos e verificação real do Gemini
+
+O vínculo com cliente é opcional na agenda. Se o nome consultado não estiver no CRM, o assistente pede para escolher entre cadastrar a pessoa e agendar sem vínculo. Após a escolha, prepara uma ação com confirmação obrigatória; não cria clientes automaticamente. Reagendamentos e cancelamentos validam o título e vinculam a confirmação ao ID encontrado na empresa.
+
+`node scripts/check-gemini-live.cjs` envia as cinco mensagens de verificação à API real do Google usando o construtor de requisições da Edge Function. Lê a chave apenas de `supabase/functions/.env`, não grava dados e não substitui o teste autenticado na aplicação. `npm test` executa regressões isoladas, sem respostas de IA simuladas.
+
+### Ações compostas e latência
+
+`create_client_and_meeting` prepara uma única confirmação. A RPC `confirm_client_meeting` executa com SECURITY INVOKER e RLS, bloqueia a confirmação durante a transação, reutiliza o cliente e grava a reunião vinculada. Repetir a mesma confirmação devolve o resultado salvo; falhas desfazem as gravações da transação. Não há chamadas Gemini durante a confirmação.
+
+Cada turno usa no máximo uma geração do Gemini, com schemas selecionados por assunto. Consultas formatam os valores reais do banco sem uma segunda geração. Existem no máximo duas tentativas transitórias de 9 segundos, dentro do limite global de 25 segundos. Erros de chave, permissão e cota não são repetidos automaticamente. Logs `nexus-ai-timing` registram somente ID da requisição, modelo, status e duração das etapas, sem mensagens, chaves ou dados pessoais.

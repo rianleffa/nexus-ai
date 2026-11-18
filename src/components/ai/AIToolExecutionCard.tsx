@@ -17,8 +17,11 @@ export const AIToolExecutionCard: React.FC<AIToolExecutionCardProps> = ({
   result,
   status,
 }) => {
+  const summary = status === 'success' ? 'Operação concluída' : status === 'error' ? 'Não foi possível concluir' : status === 'pending_confirmation' ? 'Aguardando confirmação' : 'Processando solicitação';
   return (
-    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/90 text-xs shadow-sm">
+    <details className="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/90 text-xs shadow-sm">
+      <summary className="cursor-pointer px-3.5 py-2 text-slate-600 dark:text-slate-300">{summary} · Ver detalhes</summary>
+      <div className="border-t border-slate-200 dark:border-slate-800">
       {/* Header with security tag */}
       <div className="flex items-center justify-between px-3.5 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-800/50">
         <div className="flex items-center gap-2">
@@ -84,6 +87,7 @@ export const AIToolExecutionCard: React.FC<AIToolExecutionCardProps> = ({
           </span>
         </div>
       )}
-    </div>
+      </div>
+    </details>
   );
 };

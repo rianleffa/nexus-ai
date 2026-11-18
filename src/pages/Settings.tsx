@@ -388,7 +388,7 @@ export const Settings: React.FC = () => {
                 label="CNPJ"
                 value={cnpj}
                 onChange={(e) => setCnpj(e.target.value)}
-                placeholder="00.000.000/0001-00"
+                placeholder="Informe o CNPJ"
               />
             </div>
 

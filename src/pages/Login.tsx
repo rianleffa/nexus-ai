@@ -37,9 +37,9 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
   const [isResetLoading, setIsResetLoading] = useState(false);
   const [resetNotice, setResetNotice] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
-  const authNotice = new URLSearchParams(window.location.search).get('auth') === 'confirmed'
+  const [authNotice] = useState(() => new URLSearchParams(window.location.search).get('auth') === 'confirmed'
     ? 'E-mail confirmado. Entre para continuar.'
-    : null;
+    : null);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -105,7 +105,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4 relative overflow-hidden">
+    <main id="main-content" className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4 relative overflow-hidden">
       {/* Background Ambient Glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-72 h-72 bg-brand-50 rounded-full blur-3xl pointer-events-none" />
@@ -120,7 +120,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
             <span>NEXUS</span>
             <span className="text-brand-400">AI</span>
           </h1>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-600">
             Gestão inteligente para sua empresa.
           </p>
         </div>
@@ -149,7 +149,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
             <Sparkles className="w-4 h-4 text-brand-400" />
             <span>Modo Demonstração Instantâneo</span>
           </div>
-          <p className="text-[11px] text-slate-400 mb-2.5 leading-relaxed">
+          <p className="text-[11px] text-slate-600 mb-2.5 leading-relaxed">
             Use registros de demonstração fictícios salvos apenas neste navegador. Eles não representam uma empresa real.
           </p>
           <Button
@@ -268,7 +268,7 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
         </form>}
 
         {/* Bottom Links */}
-        <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-400">
+        <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
           <div>
             Não tem uma conta?{' '}
             <button
@@ -290,6 +290,6 @@ export const Login: React.FC<LoginProps> = ({ onNavigateToRegister, onNavigateTo
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 };

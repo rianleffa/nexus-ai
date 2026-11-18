@@ -35,7 +35,8 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const configuredAuthRedirectOrigin = (import.meta.env.VITE_NEXUS_AUTH_REDIRECT_URL || '').trim();
 
 const authRedirectUrl = (params: Record<string, string> = {}) => {
-  const redirectUrl = new URL('/', configuredAuthRedirectOrigin || window.location.origin);
+  const origin = import.meta.env.DEV ? window.location.origin : configuredAuthRedirectOrigin || window.location.origin;
+  const redirectUrl = new URL('/', origin);
   Object.entries(params).forEach(([key, value]) => redirectUrl.searchParams.set(key, value));
   return redirectUrl.toString();
 };

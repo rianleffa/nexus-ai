@@ -61,7 +61,7 @@ export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4 relative overflow-hidden">
+    <main id="main-content" className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4 relative overflow-hidden">
       <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl relative z-10 animate-in zoom-in-95">
@@ -182,6 +182,6 @@ export const Register: React.FC<RegisterProps> = ({ onNavigateToLogin, onSuccess
           </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 };

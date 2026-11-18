@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { QuickCreateModal, QuickCreateTab } from './QuickCreateModal';
 import { CommandSearchModal } from './CommandSearchModal';
+import { QuickCreateContext } from './QuickCreateContext';
 
 interface LayoutProps {
   currentPage: string;
@@ -20,10 +21,10 @@ export const Layout: React.FC<LayoutProps> = ({
   const [quickCreateDefaultTab, setQuickCreateDefaultTab] = useState<QuickCreateTab>('client');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  const handleOpenQuickCreate = (tab?: QuickCreateTab) => {
+  const handleOpenQuickCreate = useCallback((tab?: QuickCreateTab) => {
     if (tab) setQuickCreateDefaultTab(tab);
     setIsQuickCreateOpen(true);
-  };
+  }, []);
 
   const quickCreateTabByPage: Partial<Record<string, QuickCreateTab>> = {
     clients: 'client',
@@ -34,6 +35,7 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
+    <QuickCreateContext.Provider value={handleOpenQuickCreate}>
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
       {/* Sidebar */}
       <Sidebar
@@ -73,5 +75,6 @@ export const Layout: React.FC<LayoutProps> = ({
         onNavigate={onNavigate}
       />
     </div>
+    </QuickCreateContext.Provider>
   );
 };

@@ -8,7 +8,7 @@ type PageLoader = () => Promise<React.ComponentType<any>>;
 const loadLayout: PageLoader = async () => (await import('./components/layout/Layout')).Layout;
 const loadLogin: PageLoader = async () => (await import('./pages/Login')).Login;
 const loadRegister: PageLoader = async () => (await import('./pages/Register')).Register;
-const loadDashboard: PageLoader = async () => (await import('./pages/Dashboard')).Dashboard;
+const loadDashboard: PageLoader = async () => (await import('./pages/DashboardOverview')).Dashboard;
 const loadClients: PageLoader = async () => (await import('./pages/Clients')).Clients;
 const loadProjects: PageLoader = async () => (await import('./pages/Projects')).Projects;
 const loadTasks: PageLoader = async () => (await import('./pages/Tasks')).Tasks;

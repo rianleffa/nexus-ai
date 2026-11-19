@@ -4,9 +4,6 @@ import {
   Sparkles,
   Bot,
   User as UserIcon,
-  ShieldCheck,
-  Wrench,
-  CornerDownLeft,
   RotateCcw,
   Zap,
   CheckCircle2,
@@ -15,7 +12,6 @@ import {
 import confetti from 'canvas-confetti';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { AIToolExecutionCard } from '../components/ai/AIToolExecutionCard';
 import { AIConfirmationCard } from '../components/ai/AIConfirmationCard';
 import { AIService } from '../services/ai/aiService';
 import { ChatMessage } from '../types';
@@ -46,7 +42,23 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem(conversationKey) || 'null');
-      if (Array.isArray(saved) && saved.length) return saved.filter(m => ['user','assistant'].includes(m.sender)).slice(-40);
+      if (Array.isArray(saved) && saved.length) return saved
+        .filter(m => ['user','assistant'].includes(m.sender))
+        .map(({ id, sender, content, timestamp, feedback, pendingConfirmation }) => ({
+          id,
+          sender,
+          content,
+          timestamp,
+          feedback,
+          ...(pendingConfirmation?.confirmationToken ? {
+            pendingConfirmation: {
+              id: pendingConfirmation.id,
+              message: pendingConfirmation.message,
+              confirmationToken: pendingConfirmation.confirmationToken,
+            },
+          } : {}),
+        }))
+        .slice(-40);
     } catch {}
     return [
     {
@@ -61,7 +73,13 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
   });
 
   useEffect(() => {
-    try { sessionStorage.setItem(conversationKey, JSON.stringify(messages.slice(-40))); } catch {}
+    try {
+      const safeMessages = messages.slice(-40).map(({ id, sender, content, timestamp, feedback, pendingConfirmation }) => ({
+        id, sender, content, timestamp, feedback,
+        ...(pendingConfirmation ? { pendingConfirmation } : {}),
+      }));
+      sessionStorage.setItem(conversationKey, JSON.stringify(safeMessages));
+    } catch {}
   }, [conversationKey, messages]);
 
   // If navigated with an initial prompt, fill it in
@@ -96,23 +114,22 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       const response = await AIService.processMessage(textToSend, [...messages, userMsg]);
       setMessages((prev) => [...prev, response]);
 
-      if (response.toolCall?.status === 'success' && response.toolCall.result?.changesMade) {
+      if (response.feedback === 'success') {
         confetti({
           particleCount: 40,
           spread: 50,
           origin: { y: 0.8 },
         });
-        showToast('Ação executada com sucesso pelo Assistente IA!', 'success');
-      } else if (response.toolCall?.status === 'success') {
-        showToast('Consulta concluída com dados do Supabase.', 'success');
+        showToast('Tudo certo!', 'success');
       }
-    } catch (err: any) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           sender: 'assistant',
-          content: err?.message || 'Não foi possível concluir a solicitação. Nenhuma nova ação foi confirmada.',
+          content: 'Não foi possível concluir a operação. Tente novamente.',
+          feedback: 'error',
           timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -122,14 +139,14 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
     }
   };
 
-  const handleConfirmAction = async (confId: string, toolName: string, parameters: Record<string, any>) => {
-    if (busyRef.current) throw new Error('Aguarde a operação em andamento.');
+  const handleConfirmAction = async (confId: string) => {
+    if (busyRef.current) return;
     busyRef.current = true;
     setActiveAction(confId);
     try {
       const pending = messages.find((msg) => msg.pendingConfirmation?.id === confId)?.pendingConfirmation;
       if (!pending?.confirmationToken) throw new Error('Confirmação inválida ou expirada. Envie a solicitação novamente.');
-      const { message, result } = await AIService.executeConfirmed(pending.confirmationToken);
+      const { message } = await AIService.executeConfirmed(pending.confirmationToken);
       
       confetti({
         particleCount: 50,
@@ -137,7 +154,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         origin: { y: 0.8 },
       });
 
-      showToast('Ação confirmada e gravada no Supabase.', 'success');
+      showToast('Operação concluída.', 'success');
       try {
         const remoteData = await supabaseSync.fetchRemoteData(company?.id);
         if (remoteData) dataStore.syncFromRemote(remoteData);
@@ -153,43 +170,25 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
               ...msg,
               content: message,
               pendingConfirmation: undefined,
-              toolCall: {
-                toolName,
-                parameters,
-                steps: [
-                  { label: 'Autorização recebida do usuário', status: 'success' },
-                  { label: `Execução da ferramenta: ${toolName}`, status: 'success' },
-                  { label: 'Alteração confirmada pelo Supabase', status: 'success' },
-                ],
-                result,
-                status: 'success',
-              },
+              feedback: 'success',
             };
           }
           return msg;
         })
       );
-    } catch (e: any) {
-      showToast(`Erro ao confirmar: ${e.message}`, 'error');
+    } catch {
+      showToast('Não foi possível concluir a operação. Tente novamente.', 'error');
       setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
         ? {
             ...msg,
-            content: `Não foi possível confirmar a operação: ${e?.message || 'erro inesperado'}. Consulte os registros antes de tentar novamente.`,
+            content: 'Não foi possível concluir a operação. Tente novamente.',
+            feedback: 'error',
             // The server consumes confirmation tokens before executing the write.
             // Do not leave a retry button that could replay a partially completed request.
             pendingConfirmation: undefined,
-            toolCall: {
-              toolName,
-              parameters,
-              steps: [
-                { label: 'Confirmação recebida', status: 'success' },
-                { label: 'Persistência no Supabase', status: 'error', detail: e?.message || 'A operação não foi concluída.' },
-              ],
-              status: 'error',
-            },
           }
         : msg));
-      throw e;
+      throw new Error('Não foi possível concluir a operação. Tente novamente.');
     } finally {
       busyRef.current = false;
       setActiveAction(null);
@@ -207,12 +206,12 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
         ? { ...msg, content: 'Operação cancelada. Nenhuma alteração foi realizada.', pendingConfirmation: undefined }
         : msg));
-    } catch (error: any) {
-      showToast(error?.message || 'Não foi possível cancelar esta confirmação.', 'error');
+    } catch {
+      showToast('Não foi possível concluir a operação. Tente novamente.', 'error');
       setMessages((prev) => prev.map((msg) => msg.pendingConfirmation?.id === confId
-        ? { ...msg, content: `Não foi possível confirmar o cancelamento: ${error?.message || 'erro inesperado'}. Nenhuma alteração de negócio foi executada.`, pendingConfirmation: undefined, toolCall: { toolName: pending.toolName, parameters: pending.parameters, steps: [{ label: 'Cancelamento no servidor', status: 'error' }], status: 'error' } }
+        ? { ...msg, content: 'Não foi possível concluir a operação. Tente novamente.', feedback: 'error', pendingConfirmation: undefined }
         : msg));
-      throw error;
+      throw new Error('Não foi possível concluir a operação. Tente novamente.');
     } finally {
       busyRef.current = false;
       setActiveAction(null);
@@ -230,8 +229,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         content: 'Histórico reiniciado. Como posso ajudar com a gestão da empresa agora?',
       }]);
-    } catch (error: any) {
-      showToast(error?.message || 'Não foi possível cancelar uma confirmação pendente.', 'error');
+    } catch {
+      showToast('Não foi possível limpar a conversa. Tente novamente.', 'error');
     }
   };
 
@@ -263,9 +262,6 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
               <Sparkles className="w-5 h-5 text-brand-500 animate-pulse" />
               <span>NEXUS AI</span>
             </h1>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
-              Google Gemini • Function Calling
-            </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Seu assistente inteligente para gestão empresarial orientada por linguagem natural
@@ -334,34 +330,16 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
 
               {/* Message Content formatted */}
               <div className="whitespace-pre-line text-xs font-normal leading-relaxed">
+                {msg.feedback === 'success' && <CheckCircle2 aria-label="Concluído" className="inline w-3.5 h-3.5 mr-1.5 text-emerald-500 align-[-2px]" />}
+                {msg.feedback === 'error' && <AlertTriangle aria-label="Erro" className="inline w-3.5 h-3.5 mr-1.5 text-rose-500 align-[-2px]" />}
                 {msg.content}
               </div>
-
-              {/* Tool Calling Step Card */}
-              {msg.toolCall && (
-                <AIToolExecutionCard
-                  toolName={msg.toolCall.toolName}
-                  parameters={msg.toolCall.parameters}
-                  steps={msg.toolCall.steps}
-                  result={msg.toolCall.result}
-                  status={msg.toolCall.status}
-                />
-              )}
 
               {/* Sensitive Action Confirmation Card */}
               {msg.pendingConfirmation && (
                 <AIConfirmationCard
-                  confirmationId={msg.pendingConfirmation.id}
-                  toolName={msg.pendingConfirmation.toolName}
-                  parameters={msg.pendingConfirmation.parameters}
                   message={msg.pendingConfirmation.message}
-                  onConfirm={() =>
-                    handleConfirmAction(
-                      msg.pendingConfirmation!.id,
-                      msg.pendingConfirmation!.toolName,
-                      msg.pendingConfirmation!.parameters
-                    )
-                  }
+                  onConfirm={() => handleConfirmAction(msg.pendingConfirmation!.id)}
                   disabled={isLoading || Boolean(activeAction)}
                   onCancel={() => handleCancelAction(msg.pendingConfirmation!.id)}
                 />
@@ -381,7 +359,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
               <span className="w-2 h-2 rounded-full bg-brand-500 animate-bounce [animation-delay:0.2s]" />
               <span className="w-2 h-2 rounded-full bg-brand-500 animate-bounce [animation-delay:0.4s]" />
               <span className="text-[11px] ml-1 font-medium text-slate-400">
-                Interpretando intenção e validando parâmetros de segurança...
+                Estou preparando uma resposta...
               </span>
             </div>
           </div>

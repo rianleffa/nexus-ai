@@ -108,7 +108,7 @@ async function verifyConfirmation(token: string, key: string, userId: string) {
   if (!valid) fail('Token de confirmação inválido. Envie a solicitação novamente.');
   const payload = JSON.parse(new TextDecoder().decode(fromB64url(encoded)));
   if (payload.userId !== userId || payload.expiresAt < Date.now()) fail('A confirmação expirou. Envie a solicitação novamente.');
-  return payload as { userId: string; companyId: string; tool: ToolName; args: Record<string, unknown>; logId: string; expiresAt: number };
+  return payload as { userId: string; companyId: string; logId: string; expiresAt: number };
 }
 
 async function logAction(db: SupabaseClient, row: Record<string, unknown>) {
@@ -677,7 +677,7 @@ Deno.serve(async (req: Request) => {
   const respond = (body: Record<string, unknown>, status: number) => {
     timings.totalMs = Math.round(performance.now() - requestStart);
     console.info('[nexus-ai-timing]', JSON.stringify({requestId, model, status, ...timings}));
-    return json({...body, requestId, timings}, status, origin);
+    return json(body, status, origin);
   };
   const apiKey = Deno.env.get('GEMINI_API_KEY')?.trim();
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -715,25 +715,36 @@ Deno.serve(async (req: Request) => {
     if (body.action === 'confirm' || body.action === 'cancel') {
       const token = clean(body.confirmationToken, 6000);
       const confirmation = await verifyConfirmation(token, apiKey, user.id);
-      if (confirmation.companyId !== profile.company_id || !writeTools.has(confirmation.tool)) return json({ success: false, error: 'Confirmação inválida para esta empresa.' }, 403, origin);
-      if (financeTools.has(confirmation.tool) && !['admin', 'gerente'].includes(profile.role)) return json({ success: false, error: 'Seu perfil não tem permissão para alterar lançamentos financeiros.' }, 403, origin);
-      if (body.action === 'confirm' && confirmation.tool === 'create_client_and_meeting') {
+      if (confirmation.companyId !== profile.company_id) return json({ success: false, error: 'Confirmação inválida para esta empresa.' }, 403, origin);
+      const {data: pendingAction, error: pendingActionError} = await db.from('ai_action_logs')
+        .select('tool_name,parameters')
+        .eq('id', confirmation.logId)
+        .eq('company_id', profile.company_id)
+        .eq('user_id', user.id)
+        .eq('status', 'pending_confirmation')
+        .maybeSingle();
+      if (pendingActionError || !pendingAction || !toolNames.includes(pendingAction.tool_name)) return json({ success: false, error: 'Esta confirmação já foi usada ou expirou.' }, 409, origin);
+      const confirmedTool = pendingAction.tool_name as ToolName;
+      const confirmedArgs = pendingAction.parameters as Record<string, unknown>;
+      if (!writeTools.has(confirmedTool)) return json({ success: false, error: 'Confirmação inválida.' }, 403, origin);
+      if (financeTools.has(confirmedTool) && !['admin', 'gerente'].includes(profile.role)) return json({ success: false, error: 'Seu perfil não tem permissão para alterar lançamentos financeiros.' }, 403, origin);
+      if (body.action === 'confirm' && confirmedTool === 'create_client_and_meeting') {
         const transactionStart = performance.now();
         const {data,error} = await db.rpc('confirm_client_meeting',{p_log_id:confirmation.logId});
         if(error)throw error;
         timings.databaseMs=Math.round(performance.now()-transactionStart);
         const result={success:true,data,changesMade:{entity:'calendar_event',action:'created',id:data.event.id}};
-        return respond({success:true,status:'success',text:describe(confirmation.tool,result),toolCall:{toolName:confirmation.tool,parameters:confirmation.args,result,status:'success'}},200);
+        return respond({success:true,status:'success',text:describe(confirmedTool,result)},200);
       }
       const claimed = await db.from('ai_action_logs').update({ status: 'rejected', error_message: 'Confirmação consumida.' }).eq('id', confirmation.logId).eq('company_id', profile.company_id).eq('user_id', user.id).eq('status', 'pending_confirmation').select('id').maybeSingle();
       if (claimed.error) throw claimed.error;
       if (!claimed.data) return json({ success: false, error: 'Esta confirmação já foi usada ou expirou.' }, 409, origin);
       if (body.action === 'cancel') return json({ success: true, text: 'Operação cancelada. Nenhuma alteração foi realizada.', status: 'cancelled' }, 200, origin);
       try {
-        const result = await executeTool(db, profile.company_id, user.id, confirmation.tool, confirmation.args);
+        const result = await executeTool(db, profile.company_id, user.id, confirmedTool, confirmedArgs);
         const update = await db.from('ai_action_logs').update({ status: 'success', result: result.data, error_message: null }).eq('id', confirmation.logId).eq('company_id', profile.company_id);
         if (update.error) console.error('[gemini-edge] Ação gravada, mas o log de auditoria não foi atualizado:', update.error.message);
-        return json({ success: true, text: describe(confirmation.tool, result), toolCall: { toolName: confirmation.tool, parameters: confirmation.args, result, status: 'success' } }, 200, origin);
+        return json({ success: true, status: 'success', text: describe(confirmedTool, result) }, 200, origin);
       } catch (error) {
         await db.from('ai_action_logs').update({ status: 'failed', error_message: error instanceof Error ? error.message.slice(0, 500) : 'Falha ao executar ação.' }).eq('id', confirmation.logId).eq('company_id', profile.company_id);
         throw error;
@@ -782,7 +793,7 @@ Deno.serve(async (req: Request) => {
       const returnDuplicate = (row: any) => {
         if (row.status === 'pending_confirmation') return respond({success:true,status:'needs_clarification',text:'Já recebi este mesmo pedido e existe uma ação igual pendente. Confira a mensagem anterior antes de reenviar; não criei uma segunda ação.'},200);
         if (row.status === 'failed') return respond({success:true,status:'needs_clarification',text:'A tentativa anterior teve um erro e não foi repetida para evitar duplicidade. Confira o módulo correspondente e, se a alteração não foi salva, envie o pedido novamente em alguns minutos.'},200);
-        return respond({success:true,status:'duplicate',text:`Esta mesma ação já foi concluída. Não criei outro registro.\n\n${describe(tool,{data:row.result})}`,toolCall:{toolName:tool,parameters:args,result:{data:row.result},status:'success'}},200);
+        return respond({success:true,status:'duplicate',text:`Esta mesma ação já foi concluída. Não criei outro registro.\n\n${describe(tool,{data:row.result})}`},200);
       };
       if (duplicate) return returnDuplicate(duplicate);
       const idempotencyKey=await makeIdempotencyKey(profile.company_id,user.id,tool,args);
@@ -810,16 +821,16 @@ Deno.serve(async (req: Request) => {
           const update=await db.from('ai_action_logs').update({status:'success',result:result.data,error_message:null}).eq('id',logId).eq('company_id',profile.company_id);
           if(update.error) console.error('[gemini-edge] Ação gravada, mas o log não foi finalizado:',update.error.message);
           timings.databaseMs=Math.round(performance.now()-databaseStart);
-          return respond({success:true,status:'success',text:describe(tool,result),toolCall:{toolName:tool,parameters:args,result,status:'success'}},200);
+          return respond({success:true,status:'success',text:describe(tool,result)},200);
         } catch (error) {
           await db.from('ai_action_logs').update({status:'failed',error_message:error instanceof Error?error.message.slice(0,500):'Falha ao executar ação.'}).eq('id',logId).eq('company_id',profile.company_id);
           throw error;
         }
       }
-      const token=await signConfirmation({userId:user.id,companyId:profile.company_id,tool,args,logId,expiresAt:Date.now()+5*60_000},apiKey);
+      const token=await signConfirmation({userId:user.id,companyId:profile.company_id,logId,expiresAt:Date.now()+5*60_000},apiKey);
       const message=confirmationMessage(tool,args);
       timings.databaseMs=Math.round(performance.now()-databaseStart);
-      return respond({success:true,status:'pending_confirmation',text:message,pendingConfirmation:{id:logId,toolName:tool,parameters:args,message,confirmationToken:token},toolCall:{toolName:tool,parameters:args,status:'pending_confirmation'}},200);
+      return respond({success:true,status:'pending_confirmation',text:message,pendingConfirmation:{id:logId,message,confirmationToken:token}},200);
     }
     // Reads already return verified database values: no second generation or tool loop.
     const results=await Promise.all(parsedCalls.map(async ({tool,args}:any)=>{
@@ -830,21 +841,19 @@ Deno.serve(async (req: Request) => {
     timings.databaseMs=Math.round(performance.now()-databaseStart);
     const missing=results.find(({tool,result}:any)=>tool==='get_client'&&result.data?.found===false);
     if(missing)return respond({success:true,status:'needs_clarification',text:missing.result.data.guidance},200);
-    const last=results.at(-1)!;
-    return respond({success:true,text:results.map(({tool,result}:any)=>describe(tool,result)).join('\n\n'),toolCall:{toolName:last.tool,parameters:last.args,result:last.result,status:'success'}},200);
+    return respond({success:true,text:results.map(({tool,result}:any)=>describe(tool,result)).join('\n\n')},200);
   } catch (error: any) {
     if (error instanceof BusinessRuleError) return respond({ success: true, status: 'needs_clarification', text: error.message }, 200);
     const timedOut = error?.name === 'AbortError' || error?.name === 'TimeoutError';
     const transportFailure = error instanceof TypeError && !('status' in error);
     const status = Number(error?.status) || (timedOut ? 504 : transportFailure ? 502 : 400);
     const errorType = error?.errorType || (timedOut ? 'TIMEOUT' : transportFailure ? 'UPSTREAM_UNAVAILABLE' : status === 429 ? 'RATE_LIMIT' : 'API_ERROR');
-    const message = timedOut
-      ? 'O Gemini demorou mais que o esperado. Tente novamente.'
-      : transportFailure
-        ? 'Não foi possível alcançar a API do Gemini. Verifique a conexão do servidor e tente novamente.'
-        : error?.message || 'Falha ao processar a solicitação.';
-    console.error('[gemini-edge]', errorType, String(message).replace(/(?:AIza|AQ\.)[A-Za-z0-9_.-]{30,}/g, '[REDACTED]'));
-    return respond({ success: false, error: message, errorType }, status);
+    const internalMessage = String(error?.message || 'Falha ao processar a solicitação.').replace(/(?:AIza|AQ\.)[A-Za-z0-9_.-]{30,}/g, '[REDACTED]');
+    console.error('[gemini-edge]', errorType, internalMessage);
+    const publicMessage = status === 429
+      ? 'Há muitas solicitações neste momento. Aguarde um pouco e tente novamente.'
+      : 'Não foi possível concluir a operação. Tente novamente.';
+    return respond({ success: false, error: publicMessage }, status);
   }
 });
 

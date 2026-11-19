@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
-import { AlertCircle, Check, X, ShieldAlert } from 'lucide-react';
+import { Check, X, ShieldAlert } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 interface AIConfirmationCardProps {
-  confirmationId: string;
-  toolName: string;
-  parameters: Record<string, any>;
   message: string;
   disabled?: boolean;
   onConfirm: () => Promise<void>;
@@ -13,8 +10,6 @@ interface AIConfirmationCardProps {
 }
 
 export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
-  toolName,
-  parameters,
   message,
   disabled = false,
   onConfirm,
@@ -73,21 +68,13 @@ export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
         <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
         <div>
           <h4 className="font-semibold text-amber-900 dark:text-amber-200 text-sm">
-            Confirmação de Ação Sensível Obrigatória
+            Confirme esta ação
           </h4>
           <p className="mt-1 text-slate-700 dark:text-slate-300 leading-relaxed">
             {message}
           </p>
         </div>
       </div>
-
-      <details className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-white/60 dark:bg-slate-900/60">
-        <summary className="cursor-pointer px-2.5 py-2 text-slate-600 dark:text-slate-400">Ver detalhes</summary>
-        <div className="border-t border-amber-200 dark:border-amber-900/50 p-2.5 font-mono text-[11px] text-slate-600 dark:text-slate-400">
-          <div className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Ação: {toolName}</div>
-          <div>Parâmetros: {JSON.stringify(parameters)}</div>
-        </div>
-      </details>
 
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button

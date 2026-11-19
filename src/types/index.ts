@@ -290,8 +290,6 @@ export interface ChatStep {
 
 export interface PendingConfirmation {
   id: string;
-  toolName: string;
-  parameters: Record<string, any>;
   message: string;
   confirmationToken: string;
 }
@@ -301,12 +299,6 @@ export interface ChatMessage {
   sender: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
-  toolCall?: {
-    toolName: string;
-    parameters: Record<string, any>;
-    steps: ChatStep[];
-    result?: AIToolExecutionResult;
-    status: 'interpreting' | 'validating' | 'executing' | 'success' | 'error' | 'pending_confirmation';
-  };
+  feedback?: 'success' | 'error';
   pendingConfirmation?: PendingConfirmation;
 }

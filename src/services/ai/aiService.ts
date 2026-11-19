@@ -1,5 +1,5 @@
-import type { AIToolExecutionResult, ChatMessage } from '../../types';
-import { supabase, isSupabaseConfigured, supabaseProjectUrl } from '../supabase';
+import type { ChatMessage } from '../../types';
+import { supabase, isSupabaseConfigured } from '../supabase';
 
 type AssistantResponse = {
   success: boolean;
@@ -7,29 +7,18 @@ type AssistantResponse = {
   error?: string;
   status?: 'pending_confirmation' | 'success' | 'cancelled' | 'needs_clarification';
   pendingConfirmation?: ChatMessage['pendingConfirmation'];
-  toolCall?: {
-    toolName: string;
-    parameters: Record<string, unknown>;
-    result?: AIToolExecutionResult;
-    status: 'success' | 'error' | 'pending_confirmation';
-  };
 };
 
 const timestamp = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
 async function invokeAssistant(body: Record<string, unknown>): Promise<AssistantResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error('O assistente requer uma sessão Supabase configurada.');
+  if (!isSupabaseConfigured || !supabase) throw new Error('Não foi possível conectar ao assistente. Tente novamente.');
   const { data, error } = await supabase.functions.invoke('gemini', { body, signal: AbortSignal.timeout(35_000) });
   if (error) {
-    const context = (error as any).context;
-    const details = context instanceof Response ? await context.clone().json().catch(() => null) : context;
-    const serverMessage = details?.body?.error || details?.error || error.message;
-    if (/failed to send a request to the edge function|failed to fetch|fetch failed/i.test(error.message)) {
-      throw new Error(`Não foi possível alcançar a função Gemini em ${supabaseProjectUrl}/functions/v1/gemini. Verifique se ela está implantada nesse projeto Supabase e se a URL pública do app aponta para o projeto correto.`);
-    }
-    throw new Error(serverMessage || 'Não foi possível conectar ao assistente.');
+    console.error('[nexus-ai] Falha ao conectar ao assistente:', error.message);
+    throw new Error('Não foi possível conectar ao assistente. Tente novamente.');
   }
-  if (!data?.success) throw new Error(data?.error || 'O assistente não conseguiu concluir a solicitação.');
+  if (!data?.success) throw new Error('Não foi possível concluir a operação. Tente novamente.');
   return data as AssistantResponse;
 }
 
@@ -53,21 +42,15 @@ export class AIService {
       timestamp: timestamp(),
       content: response.text,
       pendingConfirmation: response.pendingConfirmation,
-      toolCall: response.toolCall ? {
-        ...response.toolCall,
-        steps: [
-          { label: 'Solicitação validada no servidor', status: 'success' },
-          { label: response.status === 'pending_confirmation' ? 'Aguardando sua confirmação' : 'Operação concluída pelo Supabase', status: response.status === 'pending_confirmation' ? 'warning' : 'success' },
-        ],
-      } : undefined,
+      feedback: response.status === 'success' ? 'success' : undefined,
     };
   }
 
-  public static async executeConfirmed(confirmationToken: string): Promise<{ message: string; result?: AIToolExecutionResult }> {
+  public static async executeConfirmed(confirmationToken: string): Promise<{ message: string }> {
     const response = await invokeAssistant({ action: 'confirm', confirmationToken });
-    if (response.status === 'needs_clarification') throw new Error(response.text || 'A operação precisa de informações adicionais e não foi gravada.');
-    if (!response.text) throw new Error('O servidor confirmou a ação, mas não retornou a mensagem de confirmação. Consulte os registros antes de tentar novamente.');
-    return { message: response.text, result: response.toolCall?.result };
+    if (response.status === 'needs_clarification') throw new Error('Não foi possível concluir a operação. Tente novamente.');
+    if (!response.text) throw new Error('Não foi possível concluir a operação. Tente novamente.');
+    return { message: response.text };
   }
 
   public static async cancelConfirmation(confirmationToken: string): Promise<void> {

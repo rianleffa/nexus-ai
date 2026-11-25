@@ -112,12 +112,20 @@ test('missing clients explain both choices without claiming a write', () => {
   assert.match(message, /Nenhum cadastro ou agendamento foi realizado/);
 });
 
-import { selectDeclarations, combineClientMeetingCalls, getInstantReply } from './toolSelection.mjs';
+import { selectDeclarations, combineClientMeetingCalls, getInstantReply, isReadOnlyRequest, extractCalendarClientName } from './toolSelection.mjs';
 import { validTimeZone } from './business.mjs';
 test('greetings omit schemas and focused queries use a smaller tool set',()=>{
  const declarations=['get_clients','create_client_and_meeting','get_tasks','get_documents'].map(name=>({name}));
  assert.deepEqual(selectDeclarations(declarations,[{role:'user',parts:[{text:'Olá, quais funcionalidades você possui?'}]}]),[]);
  assert.deepEqual(selectDeclarations(declarations,[{role:'user',parts:[{text:'Quais tarefas estão pendentes?'}]}]).map(t=>t.name),['get_tasks']);
+});
+test('questions about meetings stay read-only and pin the named client',()=>{
+ const message='Quais reuniões tenho agendadas com Ricardo Almeida?';
+ assert.equal(isReadOnlyRequest(message),true);
+ assert.equal(extractCalendarClientName(message),'Ricardo Almeida');
+ const declarations=['get_calendar_events','create_calendar_event','cancel_calendar_event'].map(name=>({name}));
+ assert.deepEqual(selectDeclarations(declarations,[{role:'user',parts:[{text:message}]}]).map(item=>item.name),['get_calendar_events']);
+ assert.equal(isReadOnlyRequest('Agende uma reunião com Ricardo Almeida para amanhã.'),false);
 });
 test('compatible client and meeting calls become one atomic action',()=>{
  const action=combineClientMeetingCalls([{tool:'create_client',args:{name:'Maria'}},{tool:'create_calendar_event',args:{client_name:'Maria',event_date:'2026-11-19',start_time:'15:00'}}]);

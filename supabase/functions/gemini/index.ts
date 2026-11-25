@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { isInvalidApiKey, validDate } from './validation.mjs';
 import { fetchWithRetry } from './retry.mjs';
-import { selectDeclarations, combineClientMeetingCalls, getInstantReply } from './toolSelection.mjs';
+import { selectDeclarations, combineClientMeetingCalls, getInstantReply, isReadOnlyRequest, extractCalendarClientName } from './toolSelection.mjs';
 import { BusinessRuleError, buildSystemInstruction, calendarInput, missingClientGuidance, validTimeZone } from './business.mjs';
 
 const allowedOrigins = new Set([
@@ -796,7 +796,21 @@ Deno.serve(async (req: Request) => {
     }
     const parsedCalls = calls.map((call: any) => ({tool: call.name as ToolName, args: call.args}));
     if (parsedCalls.some(({tool,args}: any) => !toolNames.includes(tool) || !args || typeof args !== 'object' || Array.isArray(args))) return respond({success:false,error:'O assistente solicitou uma operação não autorizada.'},422);
+    const requestMessage = String(body.message || '');
+    const allowedTools = new Set(selectDeclarations(declarations, contents as any[]).map((item) => item.name));
+    if (parsedCalls.some(({tool}: any) => !allowedTools.has(tool))) {
+      return respond({ success: true, status: 'needs_clarification', text: 'Não consegui relacionar a resposta à sua solicitação atual. Reformule o pedido para eu consultar ou alterar o registro correto.' }, 200);
+    }
     const writes = parsedCalls.filter(({tool}: any) => writeTools.has(tool));
+    if (writes.length && isReadOnlyRequest(requestMessage)) {
+      return respond({ success: true, status: 'needs_clarification', text: 'Entendi que você pediu uma consulta. Não alterei nenhum registro; tente reformular a pergunta indicando o cliente, projeto ou período.' }, 200);
+    }
+    const calendarClientName = extractCalendarClientName(requestMessage);
+    if (calendarClientName) {
+      for (const call of parsedCalls) {
+        if (call.tool === 'get_calendar_events') call.args.client_name = calendarClientName;
+      }
+    }
     const databaseStart = performance.now();
     if (writes.length) {
       const action = combineClientMeetingCalls(parsedCalls) as {tool:ToolName;args:Record<string,unknown>} | null;

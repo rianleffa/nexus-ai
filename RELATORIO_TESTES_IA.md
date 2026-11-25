@@ -48,3 +48,9 @@ O fluxo composto `create_client_and_meeting` é a única combinação multi-aç�
 ## Próxima etapa para fechar a auditoria real
 
 Reconciliar primeiro o histórico de migrações local/remoto e validar o schema de produção. Em seguida, publicar a Edge Function correspondente, autenticar um usuário de teste autorizado e executar a matriz com registros prefixados de teste, confirmando cada resultado diretamente no banco e nos módulos da interface antes de excluir apenas esses registros de teste.
+
+## Atualização: prevenção de consulta incorreta
+
+Foi corrigida uma colisão de intenção em `toolSelection.mjs`: perguntas que contêm “reuniões agendadas” eram classificadas antes como pedido de agendamento por causa do trecho “agendadas”. A classificação de perguntas agora ocorre primeiro e oferece apenas ferramentas de leitura. O endpoint também valida que toda ferramenta chamada está entre as permitidas para a mensagem atual, rejeita chamadas de escrita quando a mensagem é uma consulta e associa o cliente mencionado após “reunião com ...” ao filtro de `client_id` da consulta.
+
+O teste regressivo reproduz “Quais reuniões tenho agendadas com Ricardo Almeida?” e confirma intenção somente de leitura, seleção de `get_calendar_events` e extração do cliente Ricardo Almeida. Resultado local: **34 testes aprovados, 0 reprovados**; lint sem erros bloqueantes (avisos existentes); build TypeScript/Vite aprovado. Esse teste não consulta o Gemini nem o banco de produção.

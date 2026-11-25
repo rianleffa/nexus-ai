@@ -24,7 +24,7 @@ import { isSupabaseConfigured } from '../services/supabase';
 import { useTheme } from '../contexts/ThemeContext';
 
 export const Settings: React.FC = () => {
-  const { user, company, updateProfile, updateCompany, changePassword, uploadAvatar, removeAvatar, uploadCompanyLogo, removeCompanyLogo } = useAuth();
+  const { user, company, updateProfile, updateCompany, saveCompany, changePassword, uploadAvatar, removeAvatar, uploadCompanyLogo, removeCompanyLogo } = useAuth();
   const { showToast } = useNotification();
   const { theme, setTheme } = useTheme();
 
@@ -188,7 +188,7 @@ export const Settings: React.FC = () => {
       showToast('Informe o nome da empresa.', 'warning');
       return;
     }
-    const saved = await updateCompany({
+    const result = await saveCompany({
       name: companyName.trim(),
       cnpj: cnpj.trim(),
       segment: segment.trim(),
@@ -200,7 +200,7 @@ export const Settings: React.FC = () => {
       city: companyCity.trim(),
       state: companyState.trim(),
     });
-    showToast(saved ? 'Dados da empresa salvos com sucesso!' : 'Não foi possível salvar os dados da empresa.', saved ? 'success' : 'error');
+    showToast(result.success ? 'Dados da empresa salvos com sucesso!' : result.message || 'Não foi possível salvar os dados da empresa.', result.success ? 'success' : 'error');
   };
 
   const handleResetData = () => {

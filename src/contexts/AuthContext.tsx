@@ -19,6 +19,7 @@ interface AuthContextType {
   register: (name: string, companyName: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }>;
   updateProfile: (updates: Partial<User>) => Promise<boolean>;
   updateCompany: (updates: Partial<Company>) => Promise<boolean>;
+  saveCompany: (updates: Partial<Company>) => Promise<{ success: boolean; message?: string }>;
   changePassword: (newPassword: string) => Promise<{ success: boolean; message: string }>;
   uploadAvatar: (file: File) => Promise<string>;
   removeAvatar: () => Promise<boolean>;
@@ -443,27 +444,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateCompany = async (updates: Partial<Company>): Promise<boolean> => {
+  const saveCompany = async (updates: Partial<Company>): Promise<{ success: boolean; message?: string }> => {
     try {
-      if (isSupabaseConfigured && supabase && company?.id) {
-        const { error } = await supabase
+      if (isSupabaseConfigured && supabase) {
+        if (!company?.id) return { success: false, message: 'A empresa desta sessão não foi identificada.' };
+        const { data, error } = await supabase
           .from('companies')
           .update({
             ...updates,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', company.id);
-        if (error) return false;
+          .eq('id', company.id)
+          .select('id')
+          .maybeSingle();
+        if (error) {
+          console.error('[Auth] Falha ao salvar empresa no Supabase.', { code: error.code, message: error.message });
+          if (error.code === '42703' || error.code === 'PGRST204') {
+            return { success: false, message: 'O banco ainda não possui um dos campos deste formulário. Aplique as migrações pendentes do Supabase e tente novamente.' };
+          }
+          if (error.code === '42501') {
+            return { success: false, message: 'Sua conta não tem permissão para atualizar os dados desta empresa.' };
+          }
+          return { success: false, message: 'O Supabase recusou a atualização. Verifique a sessão, a empresa vinculada e as políticas de acesso.' };
+        }
+        if (!data) return { success: false, message: 'Nenhuma empresa foi atualizada. Confirme se seu perfil tem acesso de administrador à empresa.' };
       }
 
       const updatedComp = dataStore.updateCompany(updates);
       setCompany(updatedComp);
-      return true;
+      return { success: true };
     } catch (e) {
       console.error('[Auth] Não foi possível atualizar a empresa.', e);
-      return false;
+      return { success: false, message: 'Não foi possível salvar os dados da empresa. Tente novamente.' };
     }
   };
+
+  const updateCompany = async (updates: Partial<Company>): Promise<boolean> => (await saveCompany(updates)).success;
 
   const changePassword = async (newPassword: string): Promise<{ success: boolean; message: string }> => {
     if (!newPassword || newPassword.length < 6) {
@@ -587,14 +603,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const removeCompanyLogo = async (): Promise<boolean> => {
     if (!company?.id) return false;
+    const previousUrl = company.logo_url;
+    const saved = await updateCompany({ logo_url: '' });
+    if (!saved) return false;
     if (isSupabaseConfigured && supabase) {
-      const path = getPublicStoragePath(company.logo_url, 'company-logos');
+      const path = getPublicStoragePath(previousUrl, 'company-logos');
       if (path && path.startsWith(`${company.id}/`)) {
         const { error } = await supabase.storage.from('company-logos').remove([path]);
-        if (error) return false;
+        if (error) {
+          await updateCompany({ logo_url: previousUrl });
+          console.error('[Auth] Não foi possível remover o objeto antigo do Storage.', { message: error.message });
+          return false;
+        }
       }
     }
-    return await updateCompany({ logo_url: '' });
+    return true;
   };
 
   const logout = async () => {
@@ -633,6 +656,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         updateProfile,
         updateCompany,
+        saveCompany,
         changePassword,
         uploadAvatar,
         removeAvatar,

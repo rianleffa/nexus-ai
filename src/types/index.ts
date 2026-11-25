@@ -138,6 +138,8 @@ export interface FinancialTransaction {
   company_id: string;
   client_id?: string;
   client_name?: string;
+  project_id?: string;
+  project_name?: string;
   type: TransactionType;
   description: string;
   amount: number;

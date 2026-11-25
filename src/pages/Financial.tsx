@@ -12,6 +12,10 @@ import {
   CreditCard,
   Building,
   ExternalLink,
+  Pencil,
+  Trash2,
+  Check,
+  X,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -22,6 +26,25 @@ import {
 } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
 import { getLocalDateISO } from '../utils/dates';
+import { supabaseSync } from '../services/supabaseSync';
+import { Client, TransactionCategory, TransactionStatus } from '../types';
+
+interface TransactionForm {
+  description: string;
+  amount: string;
+  category: TransactionCategory;
+  client_id: string;
+  project_id: string;
+  due_date: string;
+  payment_date: string;
+  payment_method: FinancialTransaction['payment_method'];
+  status: TransactionStatus;
+}
+
+const transactionCategories: TransactionCategory[] = ['Vendas', 'Serviços', 'Salários', 'Marketing', 'Operacional', 'Impostos', 'Outros'];
+const emptyTransactionForm: TransactionForm = {
+  description: '', amount: '', category: 'Outros', client_id: '', project_id: '', due_date: getLocalDateISO(), payment_date: '', payment_method: 'pix', status: 'pendente',
+};
 
 interface FinancialProps {
   initialType?: 'all' | 'receita' | 'despesa';
@@ -36,6 +59,10 @@ export const Financial: React.FC<FinancialProps> = ({
   const [typeFilter, setTypeFilter] = useState<'all' | 'receita' | 'despesa'>(initialType);
   const [searchQuery, setSearchQuery] = useState('');
   const { showToast } = useNotification();
+  const [editingTransaction, setEditingTransaction] = useState<FinancialTransaction | null>(null);
+  const [transactionForm, setTransactionForm] = useState<TransactionForm>(emptyTransactionForm);
+  const [savingTransaction, setSavingTransaction] = useState(false);
+  const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
 
 
   const refresh = () => setTransactions(dataStore.getFinancialTransactions());
@@ -54,6 +81,95 @@ export const Financial: React.FC<FinancialProps> = ({
 
   const formatBRL = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  const openTransactionEditor = (transaction: FinancialTransaction) => {
+    setEditingTransaction(transaction);
+    setTransactionForm({
+      description: transaction.description,
+      amount: String(transaction.amount),
+      category: transaction.category,
+      client_id: transaction.client_id || '',
+      project_id: transaction.project_id || '',
+      due_date: transaction.due_date,
+      payment_date: transaction.payment_date || '',
+      payment_method: transaction.payment_method,
+      status: transaction.status,
+    });
+  };
+
+  const handleSaveTransaction = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingTransaction || savingTransaction) return;
+    const amount = Number(transactionForm.amount.replace(',', '.'));
+    if (!transactionForm.description.trim() || !Number.isFinite(amount) || amount <= 0 || !transactionForm.due_date) {
+      showToast('Informe descrição, valor maior que zero e vencimento válido.', 'warning');
+      return;
+    }
+    setSavingTransaction(true);
+    try {
+      const client: Client | undefined = transactionForm.client_id ? dataStore.getClient(transactionForm.client_id) : undefined;
+      const project = transactionForm.project_id ? dataStore.getProject(transactionForm.project_id) : undefined;
+      const updates: Partial<FinancialTransaction> = {
+        description: transactionForm.description.trim(),
+        amount,
+        category: transactionForm.category,
+        client_id: client?.id,
+        client_name: client?.name,
+        project_id: project?.id,
+        project_name: project?.name,
+        due_date: transactionForm.due_date,
+        payment_date: transactionForm.status === 'pago' ? (transactionForm.payment_date || transactionForm.due_date) : undefined,
+        payment_method: transactionForm.payment_method,
+        status: transactionForm.status,
+      };
+      const saved = await supabaseSync.syncFinancialTransaction('upsert', { ...editingTransaction, ...updates });
+      if (!saved) {
+        showToast('Não foi possível salvar a alteração no Supabase. Verifique sua sessão e as permissões financeiras.', 'error');
+        return;
+      }
+      dataStore.updateFinancialTransaction(editingTransaction.id, updates, false);
+      setEditingTransaction(null);
+      showToast('Lançamento atualizado com sucesso.', 'success');
+    } finally {
+      setSavingTransaction(false);
+    }
+  };
+
+  const handleDeleteTransaction = async (transaction: FinancialTransaction) => {
+    if (!window.confirm(`Excluir ${transaction.type === 'receita' ? 'a receita' : 'a despesa'} “${transaction.description}”? Esta ação não pode ser desfeita.`)) return;
+    setBusyTransactionId(transaction.id);
+    try {
+      const deleted = await supabaseSync.syncFinancialTransaction('delete', transaction);
+      if (!deleted) {
+        showToast('Não foi possível excluir o lançamento do Supabase.', 'error');
+        return;
+      }
+      dataStore.deleteFinancialTransaction(transaction.id, false);
+      showToast('Lançamento excluído.', 'success');
+    } finally {
+      setBusyTransactionId(null);
+    }
+  };
+
+  const handleTogglePaid = async (transaction: FinancialTransaction) => {
+    setBusyTransactionId(transaction.id);
+    try {
+      const paid = transaction.status !== 'pago';
+      const updates: Partial<FinancialTransaction> = {
+        status: paid ? 'pago' : 'pendente',
+        payment_date: paid ? getLocalDateISO() : undefined,
+      };
+      const saved = await supabaseSync.syncFinancialTransaction('upsert', { ...transaction, ...updates });
+      if (!saved) {
+        showToast('Não foi possível atualizar o status no Supabase.', 'error');
+        return;
+      }
+      dataStore.updateFinancialTransaction(transaction.id, updates, false);
+      showToast(paid ? 'Lançamento marcado como pago/recebido.' : 'Lançamento reaberto como pendente.', 'success');
+    } finally {
+      setBusyTransactionId(null);
+    }
+  };
 
   // Cash received and paid during the current month.
   const today = getLocalDateISO();
@@ -232,11 +348,12 @@ export const Financial: React.FC<FinancialProps> = ({
                 <th className="px-5 py-3.5">Método</th>
                 <th className="px-5 py-3.5">Status</th>
                 <th className="px-5 py-3.5 text-right">Valor</th>
+                <th className="px-5 py-3.5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {filteredTransactions.length === 0 ? (
-                <tr><td colSpan={9} className="px-5 py-10 text-center text-slate-500 dark:text-slate-400">
+                <tr><td colSpan={10} className="px-5 py-10 text-center text-slate-500 dark:text-slate-400">
                   {transactions.length === 0 ? 'Nenhum lançamento registrado. Crie sua primeira receita ou despesa para iniciar o controle financeiro.' : 'Nenhum lançamento corresponde à busca e ao filtro selecionados.'}
                 </td></tr>
               ) : filteredTransactions.map((tx) => {
@@ -295,6 +412,21 @@ export const Financial: React.FC<FinancialProps> = ({
                     }`}>
                       {tx.type === 'receita' ? '+' : '-'} {formatBRL(tx.amount)}
                     </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {tx.status !== 'pago' && (
+                          <button type="button" onClick={() => void handleTogglePaid(tx)} disabled={busyTransactionId === tx.id} aria-label={tx.type === 'receita' ? 'Marcar receita como recebida' : 'Marcar despesa como paga'} title={tx.type === 'receita' ? 'Marcar como recebido' : 'Marcar como pago'} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40">
+                            <Check className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button type="button" onClick={() => openTransactionEditor(tx)} aria-label={'Editar lançamento ' + tx.description} title="Editar" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-brand-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-400">
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => void handleDeleteTransaction(tx)} disabled={busyTransactionId === tx.id} aria-label={'Excluir lançamento ' + tx.description} title="Excluir" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-500 transition hover:bg-rose-50 disabled:opacity-50 dark:hover:bg-rose-950/40">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -302,6 +434,67 @@ export const Financial: React.FC<FinancialProps> = ({
           </table>
         </div>
       </Card>
+
+      {editingTransaction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !savingTransaction) setEditingTransaction(null); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="edit-transaction-title" className="my-auto w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+            <header className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h2 id="edit-transaction-title" className="text-base font-bold text-slate-900 dark:text-white">Editar {editingTransaction.type === 'receita' ? 'receita' : 'despesa'}</h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">As alterações serão confirmadas pelo Supabase antes da atualização da tela.</p>
+              </div>
+              <button type="button" onClick={() => setEditingTransaction(null)} disabled={savingTransaction} aria-label="Fechar edição" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
+            </header>
+            <form onSubmit={handleSaveTransaction} className="space-y-4">
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Descrição
+                <input required maxLength={255} value={transactionForm.description} onChange={(event) => setTransactionForm((form) => ({ ...form, description: event.target.value }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-white" />
+              </label>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Valor (R$)
+                  <input required type="number" min="0.01" step="0.01" value={transactionForm.amount} onChange={(event) => setTransactionForm((form) => ({ ...form, amount: event.target.value }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-white" />
+                </label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Categoria
+                  <select value={transactionForm.category} onChange={(event) => setTransactionForm((form) => ({ ...form, category: event.target.value as TransactionCategory }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+                    {transactionCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                </label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Cliente
+                  <select value={transactionForm.client_id} onChange={(event) => setTransactionForm((form) => ({ ...form, client_id: event.target.value }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+                    <option value="">Sem vínculo</option>
+                    {dataStore.getClients().map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                  </select>
+                </label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Projeto
+                  <select value={transactionForm.project_id} onChange={(event) => setTransactionForm((form) => ({ ...form, project_id: event.target.value }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+                    <option value="">Sem vínculo</option>
+                    {dataStore.getProjects().map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                  </select>
+                </label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Vencimento
+                  <input required type="date" value={transactionForm.due_date} onChange={(event) => setTransactionForm((form) => ({ ...form, due_date: event.target.value }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-white" />
+                </label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Data de pagamento/recebimento
+                  <input type="date" disabled={transactionForm.status !== 'pago'} value={transactionForm.payment_date} onChange={(event) => setTransactionForm((form) => ({ ...form, payment_date: event.target.value }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900/80 dark:text-white" />
+                </label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Forma de pagamento
+                  <select value={transactionForm.payment_method} onChange={(event) => setTransactionForm((form) => ({ ...form, payment_method: event.target.value as FinancialTransaction['payment_method'] }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+                    <option value="pix">PIX</option><option value="boleto">Boleto</option><option value="cartao">Cartão</option><option value="transferencia">Transferência</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Status
+                  <select value={transactionForm.status} onChange={(event) => setTransactionForm((form) => ({ ...form, status: event.target.value as TransactionStatus }))} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+                    <option value="pendente">Pendente</option><option value="pago">Pago/recebido</option><option value="atrasado">Atrasado</option>
+                  </select>
+                </label>
+              </div>
+              <footer className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                <Button type="button" variant="outline" onClick={() => setEditingTransaction(null)} disabled={savingTransaction}>Cancelar</Button>
+                <Button type="submit" variant="primary" isLoading={savingTransaction}>Salvar alterações</Button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
 
     </div>
   );

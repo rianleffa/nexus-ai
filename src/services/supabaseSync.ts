@@ -147,6 +147,7 @@ class SupabaseSyncService {
         notifications: [],
       };
       const clientNames = new Map((clientsRes.data || []).map((client: any) => [client.id, client.name]));
+      const projectNames = new Map((projectsRes.data || []).map((project: any) => [project.id, project.name]));
       const userNames = new Map((usersRes.data || []).map((companyUser: any) => [companyUser.id, companyUser.name]));
 
       if (clientsRes.data) {
@@ -227,6 +228,8 @@ class SupabaseSyncService {
           id: tr.id,
           company_id: tr.company_id,
           client_id: tr.client_id,
+          project_id: tr.project_id,
+          project_name: tr.project_id ? projectNames.get(tr.project_id) : undefined,
           type: tr.type,
           description: tr.description,
           amount: Number(tr.amount) || 0,
@@ -466,17 +469,23 @@ class SupabaseSyncService {
   public async syncFinancialTransaction(
     action: 'upsert' | 'delete',
     transaction: Partial<FinancialTransaction> & { id: string }
-  ) {
-    if (!isSupabaseConfigured || !supabase) return;
+  ): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return true;
     try {
       if (action === 'delete') {
-        const { error } = await supabase.from('financial_transactions').delete().eq('id', transaction.id);
+        const { data, error } = await supabase.from('financial_transactions').delete()
+          .eq('id', transaction.id)
+          .eq('company_id', transaction.company_id)
+          .select('id')
+          .maybeSingle();
         if (error) throw error;
+        if (!data) throw new Error('Nenhum lançamento foi excluído. Verifique as permissões da empresa.');
       } else {
-        const { error } = await supabase.from('financial_transactions').upsert({
+        const { data, error } = await supabase.from('financial_transactions').upsert({
           id: transaction.id,
           company_id: transaction.company_id,
           client_id: transaction.client_id || null,
+          project_id: transaction.project_id || null,
           type: transaction.type,
           description: transaction.description,
           amount: transaction.amount || 0,
@@ -487,13 +496,16 @@ class SupabaseSyncService {
           status: transaction.status || 'pendente',
           notes: transaction.notes,
           updated_at: new Date().toISOString(),
-        });
+        }).select('id').maybeSingle();
         if (error) throw error;
+        if (!data) throw new Error('O Supabase não confirmou o salvamento do lançamento.');
       }
       this.setStatus('connected');
+      return true;
     } catch (err) {
       this.setStatus('error');
       console.warn('[SupabaseSync] Erro ao sincronizar transação financeira:', err);
+      return false;
     }
   }
 

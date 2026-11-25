@@ -954,7 +954,7 @@ class DataStore {
     return newTx;
   }
 
-  public updateFinancialTransaction(id: string, updates: Partial<FinancialTransaction>): FinancialTransaction | null {
+  public updateFinancialTransaction(id: string, updates: Partial<FinancialTransaction>, syncRemotely = true): FinancialTransaction | null {
     const idx = this.transactions.findIndex((t) => t.id === id);
     if (idx === -1) return null;
     this.transactions[idx] = {
@@ -963,16 +963,17 @@ class DataStore {
       updated_at: new Date().toISOString(),
     };
     this.persist();
-    supabaseSync.syncFinancialTransaction('upsert', this.transactions[idx]);
+    if (syncRemotely) void supabaseSync.syncFinancialTransaction('upsert', this.transactions[idx]);
     return this.transactions[idx];
   }
 
-  public deleteFinancialTransaction(id: string): boolean {
+  public deleteFinancialTransaction(id: string, syncRemotely = true): boolean {
+    const transaction = this.transactions.find((item) => item.id === id);
     const initialLen = this.transactions.length;
     this.transactions = this.transactions.filter((t) => t.id !== id);
     if (this.transactions.length !== initialLen) {
       this.persist();
-      supabaseSync.syncFinancialTransaction('delete', { id });
+      if (syncRemotely) void supabaseSync.syncFinancialTransaction('delete', { id, company_id: transaction?.company_id });
       return true;
     }
     return false;

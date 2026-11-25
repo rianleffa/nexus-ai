@@ -1,6 +1,6 @@
 # Auditoria do Assistente IA — NEXUS AI
 
-Data da auditoria: 25/11/2026  
+Data da auditoria: 25/11/2026
 Ambiente de código: branch `main`, projeto `rianleffa/nexus-ai`.
 
 ## Correções implementadas

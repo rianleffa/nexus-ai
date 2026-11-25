@@ -249,7 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      const unsubRealtime = supabaseSync.subscribeToRealtime(async () => {
+      const unsubRealtime = supabaseSync.subscribeToRealtime(company!.id, async () => {
         const remoteData = await supabaseSync.fetchRemoteData(company?.id);
         if (active && remoteData) {
           dataStore.syncFromRemote(remoteData);

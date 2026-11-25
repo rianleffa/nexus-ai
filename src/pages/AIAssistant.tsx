@@ -114,6 +114,11 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
 
     try {
       const response = await AIService.processMessage(textToSend, [...messages, userMsg], initialContextPage);
+      if (response.feedback === 'success' && company?.id) {
+        const remoteData = await supabaseSync.fetchRemoteData(company.id);
+        if (remoteData) dataStore.syncFromRemote(remoteData);
+        else showToast('A ação foi concluída, mas a atualização dos módulos está atrasada.', 'warning');
+      }
       setMessages((prev) => [...prev, response]);
 
       if (response.feedback === 'success') {

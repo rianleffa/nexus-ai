@@ -283,8 +283,8 @@ class SupabaseSyncService {
   /**
    * Inscreve nos canais Realtime para escutar alterações em tempo real do Postgres
    */
-  public subscribeToRealtime(onRemoteChange: () => void): () => void {
-    if (!isSupabaseConfigured || !supabase) {
+  public subscribeToRealtime(companyId: string, onRemoteChange: () => void): () => void {
+    if (!isSupabaseConfigured || !supabase || !companyId) {
       return () => {};
     }
 
@@ -293,27 +293,34 @@ class SupabaseSyncService {
         supabase.removeChannel(this.activeChannel);
       }
 
-      this.activeChannel = supabase
-        .channel('public:nexus_changes')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public' },
-          (payload) => {
-            console.log('[SupabaseSync] Alteração em tempo real detectada:', payload.table, payload.eventType);
+      let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+      const channel = supabase.channel(`public:nexus_changes:${companyId}`);
+      const tables = ['clients', 'projects', 'tasks', 'calendar_events', 'financial_transactions', 'documents', 'document_categories', 'notifications', 'users'];
+      for (const table of tables) {
+        channel.on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table,
+          filter: `company_id=eq.${companyId}`,
+        }, () => {
+          if (refreshTimer) clearTimeout(refreshTimer);
+          refreshTimer = setTimeout(() => {
+            refreshTimer = undefined;
             onRemoteChange();
-          }
-        )
-        .subscribe((status) => {
+          }, 150);
+        });
+      }
+
+      this.activeChannel = channel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             console.log('[SupabaseSync] Canal Realtime conectado com sucesso.');
           }
         });
 
       return () => {
-        if (this.activeChannel && supabase) {
-          supabase.removeChannel(this.activeChannel);
-          this.activeChannel = null;
-        }
+        if (refreshTimer) clearTimeout(refreshTimer);
+        if (supabase) void supabase.removeChannel(channel);
+        if (this.activeChannel === channel) this.activeChannel = null;
       };
     } catch (e) {
       console.warn('[SupabaseSync] Erro ao subscrever canal realtime:', e);

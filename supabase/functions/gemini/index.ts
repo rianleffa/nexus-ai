@@ -625,8 +625,8 @@ function describe(tool: ToolName, result: any) {
   return `Ação concluída com sucesso: ${item?.name || item?.title || item?.description || 'registro'}.`;
 }
 
-async function geminiCall(apiKey: string, contents: unknown[], systemInstruction: string, signal: AbortSignal) {
-  const selected = selectDeclarations(declarations, contents as any[]);
+async function geminiCall(apiKey: string, contents: unknown[], systemInstruction: string, signal: AbortSignal, allowTools = true) {
+  const selected = allowTools ? selectDeclarations(declarations, contents as any[]) : [];
   const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST', signal,
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -718,6 +718,28 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const timeZone = validTimeZone(body.timeZone);
     const signal = AbortSignal.timeout(25_000);
+
+    if (body.action === 'analyze_report') {
+      const reportData = body.reportData;
+      if (!reportData || typeof reportData !== 'object' || Array.isArray(reportData)) return json({ success: false, error: 'Os dados do relatório são inválidos.' }, 400, origin);
+      const serialized = JSON.stringify(reportData);
+      if (serialized.length > 16_000) return json({ success: false, error: 'O resumo do relatório excede o limite permitido.' }, 413, origin);
+      const now = Date.now();
+      const window = chatRateWindows.get(user.id);
+      if (!window || now - window.startedAt >= 60_000) chatRateWindows.set(user.id, { startedAt: now, count: 1 });
+      else if (window.count >= 20) return json({ success: false, error: 'Limite temporário de análises atingido. Aguarde um minuto.' }, 429, origin);
+      else window.count += 1;
+      const contents = [{ role: 'user', parts: [{ text: `Analise os dados reais filtrados abaixo para gerar um resumo gerencial breve em português brasileiro. Use somente números presentes neste JSON, não estime dados ausentes, não invente causas ou comparações. Separe fatos observados de recomendações e informe quando não houver base suficiente. A análise é somente consultiva: não solicite nem execute alterações.\n\n${serialized}` }] }];
+      const instruction = 'Você é o Nexus AI, assistente de Business Intelligence. Sua tarefa nesta chamada é somente analisar o resumo estruturado de indicadores fornecido pelo próprio sistema. Não há ferramentas de consulta ou escrita disponíveis; use exclusivamente os dados recebidos. Não trate receitas pendentes como caixa recebido, nem despesas pendentes como pagas. Chame o resultado de caixa, não de lucro contábil. Identifique atrasos, despesas relevantes, produtividade e recomendações apenas quando os dados sustentarem isso. Responda de forma concisa com: Resumo executivo, Análise financeira, Produtividade, Alertas e Recomendações. Se um grupo não tiver dados, diga isso explicitamente.';
+      const analysisStart = performance.now();
+      const response = await geminiCall(apiKey, contents, instruction, signal, false);
+      timings.geminiMs = Math.round(performance.now() - analysisStart);
+      const candidate = response.candidates?.[0];
+      if (!candidate || candidate.finishReason === 'SAFETY') return respond({ success: false, error: 'Não foi possível gerar a análise com esses dados.' }, 422);
+      const analysisText = candidate.content?.parts?.filter((part: any) => !part.thought).map((part: any) => part.text || '').join('').trim();
+      if (!analysisText) return respond({ success: false, error: 'O Nexus AI não retornou uma análise utilizável.' }, 502);
+      return respond({ success: true, text: analysisText, status: 'success' }, 200);
+    }
 
     if (body.action === 'confirm' || body.action === 'cancel') {
       const token = clean(body.confirmationToken, 6000);

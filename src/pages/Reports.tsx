@@ -1,471 +1,107 @@
-import React, { useState, useMemo } from 'react';
-import {
-  BarChart3,
-  Download,
-  Printer,
-  FileSpreadsheet,
-  Filter,
-  Calendar,
-  CheckCircle2,
-  TrendingUp,
-  DollarSign,
-  Users,
-  Briefcase,
-  PieChart,
-  ArrowUpRight,
-  ArrowDownRight,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness, CalendarDays, CheckCircle2, CircleDollarSign, Download, FileSpreadsheet, Filter, Printer, RefreshCw, Sparkles, Users, Wallet } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { dataStore } from '../services/dataStore';
-import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
-import { MonthlyComparisonChart, CategoryDonutChart } from '../components/common/ChartComponents';
+import { useNotification } from '../contexts/NotificationContext';
+import { dataStore } from '../services/dataStore';
+import { AIService } from '../services/ai/aiService';
+import { buildReportAnalytics, type ReportFilters } from '../services/reportAnalytics';
+import { exportReportCsv, exportReportExcel, exportReportPdf, openReportPreview, REPORT_KIND_LABELS, REPORT_SECTION_LABELS, type ReportExportPayload, type ReportKind, type ReportSection } from '../services/reportExport';
 import { getLocalDateISO } from '../utils/dates';
-import { ClientStatus } from '../types';
+import type { ClientStatus, ProjectStatus, TaskStatus, TransactionStatus } from '../types';
 
-export const Reports: React.FC = () => {
-  const { company } = useAuth();
-  const { showToast } = useNotification();
+type Period = ReportFilters['period'];
+type ChartMode = 'monthly'|'result'|'categories'|'clients'|'projects'|'portfolio'|'tasks'|'accounts';
+const periods: Array<{id:Period;label:string}> = [{id:'today',label:'Hoje'},{id:'week',label:'7 dias'},{id:'month',label:'Este mês'},{id:'quarter',label:'Trimestre'},{id:'year',label:'Ano'},{id:'custom',label:'Personalizado'}];
+const allSections: ReportSection[] = ['summary','finance','clients','projects','tasks','receivables'];
+const kindSections: Record<ReportKind,ReportSection[]> = {overview:allSections,finance:['summary','finance','receivables'],clients:['summary','clients'],projects:['summary','projects'],tasks:['summary','tasks'],payables:['summary','receivables','finance']};
+const statusLabels:Record<string,string>={pago:'Pago/recebido',pendente:'Pendente',atrasado:'Em atraso',ativo:'Ativo',em_negociacao:'Em negociação',inativo:'Inativo',planejamento:'Planejamento',em_andamento:'Em andamento',pausado:'Pausado',concluido:'Concluído',backlog:'Backlog',a_fazer:'A fazer'};
+const money=(n:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n||0);
+const date=(d?:string)=>d?new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC'}).format(new Date(`${d.slice(0,10)}T12:00:00Z`)):'—';
+const selectClass='w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100';
+const Metric:React.FC<{label:string;value:string;note:string;icon:React.ReactNode;color?:string}> = ({label,value,note,icon,color='brand'})=><Card className="min-w-0 p-4"><div className="flex items-start justify-between gap-2"><span className="text-xs leading-5 text-slate-500 dark:text-slate-400">{label}</span><span className={`rounded-xl p-2 ${color==='green'?'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40':color==='red'?'bg-rose-50 text-rose-600 dark:bg-rose-950/40':color==='blue'?'bg-blue-50 text-blue-600 dark:bg-blue-950/40':'bg-brand-50 text-brand-600 dark:bg-brand-950/40'}`}>{icon}</span></div><div className="mt-3 truncate text-xl font-extrabold text-slate-900 dark:text-white">{value}</div><div className="mt-1 text-[11px] text-slate-400">{note}</div></Card>;
 
-  const [selectedReport, setSelectedReport] = useState<
-    'overview' | 'finance' | 'clients' | 'tasks' | 'projects'
-  >('overview');
-  
-  const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom'>('month');
-  const [customStart, setCustomStart] = useState(() => getLocalDateISO(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
-  const [customEnd, setCustomEnd] = useState(() => getLocalDateISO());
+const ChartPanel:React.FC<{mode:ChartMode;data:ReturnType<typeof buildReportAnalytics>}> = ({mode,data})=>{
+ const options:Record<ChartMode,string>={monthly:'Evolução de receitas e despesas',result:'Resultado de caixa mensal',categories:'Despesas pagas por categoria',clients:'Receitas por cliente',projects:'Situação dos projetos',portfolio:'Carteira de clientes',tasks:'Situação das tarefas',accounts:'Contas a pagar e receber'};
+ let rows:Array<{label:string;values:Array<{name:string;value:number;color:string}>;count?:boolean;negative?:boolean}>=[];
+ const colors=['#e87532','#64748b','#0ea5e9','#22c55e','#a855f7','#f59e0b','#ef4444','#14b8a6'];
+ if(mode==='monthly') rows=data.monthlySeries.map(m=>({label:`${m.month}/${String(m.year).slice(-2)}`,values:[{name:'Recebido',value:m.revenue,color:colors[0]},{name:'Pago',value:m.expenses,color:colors[1]}]}));
+ if(mode==='result') rows=data.monthlySeries.map(m=>({label:`${m.month}/${String(m.year).slice(-2)}`,values:[{name:'Resultado',value:Math.abs(m.balance),color:m.balance>=0?'#22c55e':'#ef4444'}],negative:m.balance<0}));
+ if(mode==='categories') rows=Object.entries(data.categoryTotals).sort((a,b)=>b[1]-a[1]).map(([label,value],i)=>({label,values:[{name:'Pago',value,color:colors[i%colors.length]}]}));
+ if(mode==='clients') rows=Object.entries(data.revenueByClient).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([label,value],i)=>({label,values:[{name:'Recebido',value,color:colors[i%colors.length]}]}));
+ if(mode==='projects') rows=Object.entries(data.projectStatusTotals).map(([key,value],i)=>({label:statusLabels[key]||key,values:[{name:'Projetos',value,color:colors[i%colors.length]}],count:true}));
+ if(mode==='portfolio') rows=Object.entries(data.clientStatusTotals).map(([key,value],i)=>({label:statusLabels[key]||key,values:[{name:'Clientes',value,color:colors[i%colors.length]}],count:true}));
+ if(mode==='tasks') rows=Object.entries(data.taskStatusTotals).map(([key,value],i)=>({label:statusLabels[key]||key,values:[{name:'Tarefas',value,color:colors[i%colors.length]}],count:true}));
+ if(mode==='accounts') rows=data.receivablesByMonth.map((m,i)=>({label:m.label,values:[{name:'A receber',value:m.value,color:'#0ea5e9'},{name:'A pagar',value:data.payablesByMonth[i]?.value||0,color:'#e87532'}]}));
+ const max=Math.max(1,...rows.flatMap(r=>r.values.map(v=>v.value)));
+ const legends=[...new Set(rows.flatMap(r=>r.values.map(v=>v.name)))];
+ const isMoney=['monthly','result','categories','clients','accounts'].includes(mode);
+ return <Card className="p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800"><div><h3 className="text-sm font-bold text-slate-900 dark:text-white">{options[mode]}</h3><p className="mt-1 text-xs text-slate-400">{mode==='monthly'||mode==='result'?'Caixa confirmado nos últimos 12 meses':'Dados reais do período e filtros selecionados'}</p></div><div className="flex flex-wrap gap-3">{legends.map((name,i)=><span key={name} className="flex items-center gap-1.5 text-[10px] text-slate-500"><i className="h-2.5 w-2.5 rounded-full" style={{backgroundColor:rows.flatMap(r=>r.values).find(v=>v.name===name)?.color||colors[i]}}/>{name}</span>)}</div></div>
+ {rows.length===0||rows.every(r=>r.values.every(v=>!v.value))?<div className="flex min-h-56 items-center justify-center text-sm text-slate-400">Não há dados para este gráfico no período.</div>:<div className="mt-5 max-h-72 space-y-3 overflow-y-auto pr-1">{rows.map(r=><div key={r.label} title={r.values.map(v=>`${v.name}: ${isMoney?money(v.value):v.value}`).join(' • ')} className="grid grid-cols-[minmax(5rem,10rem)_1fr_auto] items-center gap-3 text-xs"><span className="truncate text-slate-600 dark:text-slate-300">{r.label}</span><span className="flex h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">{r.values.map(v=><i key={v.name} className="h-full transition-all" style={{width:`${v.value?Math.max(1,v.value/max*100):0}%`,backgroundColor:v.color}} />)}</span><strong className="text-right text-slate-800 dark:text-slate-200">{r.count?`${r.values[0].value} registro(s)`:r.values.map(v=>`${r.negative&&v.name==='Resultado'?'−':''}${money(v.value)}`).join(' / ')}</strong></div>)}</div>}
+ <p className="mt-4 text-[10px] text-slate-400">Passe o cursor sobre os valores para consultar a série.</p></Card>;
+};
 
-  const formatBRL = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-
-  const clientStatusLabels: Record<ClientStatus, string> = {
-    ativo: 'Ativo',
-    em_negociacao: 'Em negociação',
-    pendente: 'Pendente',
-    inativo: 'Inativo',
-  };
-
-  // Filtered metrics computed dynamically from dataStore
-  const reportData = useMemo(() => {
-    return dataStore.getFilteredReportMetrics(period, customStart, customEnd);
-  }, [period, customStart, customEnd]);
-
-  const clients = dataStore.getClients();
-  const tasks = dataStore.getTasks();
-  const projects = dataStore.getProjects();
-
-  const handleExportCSV = () => {
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    const filename = `relatorio_${selectedReport}_${period}_${new Date().getFullYear()}.csv`;
-
-    if (selectedReport === 'finance' || selectedReport === 'overview') {
-      csvContent += 'ID,Tipo,Descricao,Valor,Categoria,Vencimento,Status\n';
-      reportData.transactions.forEach((t) => {
-        csvContent += `"${t.id}","${t.type}","${t.description}","${t.amount}","${t.category}","${t.due_date}","${t.status}"\n`;
-      });
-    } else if (selectedReport === 'clients') {
-      csvContent += 'ID,Nome,Empresa,Email,Telefone,Status,Receita_Total\n';
-      clients.forEach((c) => {
-        csvContent += `"${c.id}","${c.name}","${c.company_name}","${c.email}","${c.phone}","${clientStatusLabels[c.status]}","${c.total_revenue}"\n`;
-      });
-    } else if (selectedReport === 'tasks') {
-      csvContent += 'ID,Titulo,Prioridade,Status,Prazo,Cliente\n';
-      tasks.forEach((t) => {
-        csvContent += `"${t.id}","${t.title}","${t.priority}","${t.status}","${t.due_date}","${t.client_name || ''}"\n`;
-      });
-    } else {
-      csvContent += 'ID,Nome,Orcamento,Progresso,Status,Prazo\n';
-      projects.forEach((p) => {
-        csvContent += `"${p.id}","${p.name}","${p.budget}","${p.progress}%","${p.status}","${p.due_date}"\n`;
-      });
-    }
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    showToast(`Relatório exportado em CSV com sucesso!`, 'success');
-  };
-
-  const handlePrintPDF = () => {
-    window.print();
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-brand-500" />
-            <span>Relatórios & Business Intelligence</span>
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Sintetize métricas estratégicas, visualize gráficos em tempo real e exporte auditorias
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCSV}
-            leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-500" />}
-          >
-            Exportar CSV / Excel
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handlePrintPDF}
-            leftIcon={<Printer className="w-4 h-4" />}
-          >
-            Imprimir / Salvar PDF
-          </Button>
-        </div>
-      </div>
-
-      {/* Filter Toolbar */}
-      <Card className="p-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-        {/* Period Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0 text-xs">
-          <span className="text-slate-400 font-semibold flex items-center gap-1 mr-1 shrink-0">
-            <Calendar className="w-3.5 h-3.5" /> Período:
-          </span>
-          {[
-            { id: 'today', label: 'Hoje' },
-            { id: 'week', label: 'Esta Semana' },
-            { id: 'month', label: 'Este Mês' },
-            { id: 'quarter', label: 'Trimestre' },
-            { id: 'year', label: 'Ano Vigente' },
-            { id: 'custom', label: 'Personalizado' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setPeriod(item.id as any)}
-              className={`px-3 py-1.5 rounded-xl font-semibold transition-all shrink-0 ${
-                period === item.id
-                  ? 'bg-brand-500 text-slate-900 shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Custom Date Inputs if 'custom' is active */}
-        {period === 'custom' && (
-          <div className="flex items-center gap-2 text-xs w-full lg:w-auto">
-            <input
-              type="date"
-              value={customStart}
-              onChange={(e) => setCustomStart(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs"
-            />
-            <span className="text-slate-400">até</span>
-            <input
-              type="date"
-              value={customEnd}
-              onChange={(e) => setCustomEnd(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs"
-            />
-          </div>
-        )}
-      </Card>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 space-y-2 border-emerald-200/60 dark:border-emerald-950">
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Receita Recebida no Período</span>
-            <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-500">
-              <ArrowUpRight className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-            {formatBRL(reportData.revenue)}
-          </p>
-          <span className="text-[11px] text-slate-400 flex items-center gap-1 font-semibold">
-            Pagamentos confirmados
-          </span>
-        </Card>
-
-        <Card className="p-4 space-y-2 border-rose-200/60 dark:border-rose-950">
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Despesas Operacionais</span>
-            <span className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-500">
-              <ArrowDownRight className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-rose-600 dark:text-rose-400">
-            {formatBRL(reportData.expenses)}
-          </p>
-          <span className="text-[11px] text-slate-400">
-            Despesas pagas no período
-          </span>
-        </Card>
-
-        <Card className="p-4 space-y-2 border-brand-200/60 dark:border-brand-950">
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Margem Líquida</span>
-            <span className="p-1.5 rounded-lg bg-brand-50 dark:bg-brand-950/50 text-brand-500">
-              <DollarSign className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-brand-600 dark:text-brand-400">
-            {formatBRL(reportData.netMargin)}
-          </p>
-          <span className="text-[11px] text-brand-600 font-semibold">
-            {reportData.marginPercentage}% de rentabilidade
-          </span>
-        </Card>
-
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Taxa de Entrega de Tarefas</span>
-            <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-500">
-              <CheckCircle2 className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-white">
-            {reportData.taskCompletionRate}%
-          </p>
-          <span className="text-[11px] text-slate-400">
-            {reportData.completedTasks} de {reportData.totalTasks} tarefas concluídas
-          </span>
-        </Card>
-      </div>
-
-      {/* Visual Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Bar/Area Chart (2 Cols) */}
-        <Card className="p-6 lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Evolução Mensal de Receitas vs Despesas ({new Date().getFullYear()})
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Valores reais consolidados de fluxo de caixa mensal
-              </p>
-            </div>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Valores pagos registrados</span>
-          </div>
-
-          <MonthlyComparisonChart data={reportData.monthlySeries} />
-        </Card>
-
-        {/* Right: Donut Chart of Categories (1 Col) */}
-        <Card className="p-6 space-y-4 flex flex-col justify-between">
-          <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-brand-500" />
-              <span>Distribuição de Despesas</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Custos operacionais por categoria no período
-            </p>
-          </div>
-
-          <CategoryDonutChart categories={reportData.categoryTotals} />
-        </Card>
-      </div>
-
-      {/* Module Tabs */}
-      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl">
-        {[
-          { id: 'overview', label: 'Visão Geral & Lançamentos', icon: DollarSign },
-          { id: 'clients', label: 'Carteira de Clientes', icon: Users },
-          { id: 'tasks', label: 'Quadro de Tarefas & Prazos', icon: CheckCircle2 },
-          { id: 'projects', label: 'Projetos em andamento', icon: Briefcase },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isSel = selectedReport === tab.id;
-
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedReport(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
-                isSel
-                  ? 'bg-white dark:bg-slate-900 text-brand-600 dark:text-brand-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Printable Report Paper Preview */}
-      <Card className="p-8 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-md space-y-6">
-        {/* Report Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800 gap-4">
-          <div className="flex items-center gap-4">
-            {company?.logo_url && <img src={company.logo_url} alt={`Logotipo de ${company.name}`} className="h-12 w-12 rounded-lg border border-slate-200 bg-white object-contain p-1 print:border-0" />}
-            <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">
-                {company?.name || 'Sua empresa'}
-              </span>
-              <span className="text-[10px] bg-brand-500/10 text-brand-500 font-bold px-2 py-0.5 rounded-full border border-brand-500/20">
-                NEXUS AI Analytics
-              </span>
-            </div>
-            <p className="text-xs text-slate-500">
-              CNPJ: {company?.cnpj || 'Não informado'}{company?.address ? ` • ${company.address}` : ''}{company?.city ? ` • ${company.city}${company.state ? `/${company.state}` : ''}` : ''} • Período: {reportData.startDate} até {reportData.endDate}
-            </p>
-            </div>
-          </div>
-
-          <div className="text-right text-xs">
-            <span className="text-slate-400 block text-[11px]">Gerado em</span>
-            <span className="font-bold text-slate-800 dark:text-slate-200">
-              {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        </div>
-
-        {/* Table Content */}
-        {selectedReport === 'overview' && (
-          <div className="space-y-4">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Lançamentos Financeiros do Período ({reportData.transactions.length} registros)
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-semibold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2.5">Descrição</th>
-                    <th className="p-2.5">Categoria</th>
-                    <th className="p-2.5">Vencimento</th>
-                    <th className="p-2.5">Status</th>
-                    <th className="p-2.5 text-right">Valor</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {reportData.transactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                      <td className="p-2.5 font-semibold text-slate-900 dark:text-white">{t.description}</td>
-                      <td className="p-2.5 text-slate-500">{t.category}</td>
-                      <td className="p-2.5 text-slate-400">{t.due_date}</td>
-                      <td className="p-2.5 uppercase text-[10px] font-bold text-slate-500">{t.status}</td>
-                      <td className={`p-2.5 text-right font-bold ${t.type === 'receita' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {t.type === 'receita' ? '+' : '-'} {formatBRL(t.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {selectedReport === 'clients' && (
-          <div className="space-y-4">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Carteira de Clientes Ativos ({clients.length} cadastros)
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-semibold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2.5">Cliente</th>
-                    <th className="p-2.5">Empresa</th>
-                    <th className="p-2.5">Contato</th>
-                    <th className="p-2.5">Status</th>
-                    <th className="p-2.5 text-right">Volume Faturado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {clients.map((c) => (
-                    <tr key={c.id}>
-                      <td className="p-2.5 font-semibold text-slate-900 dark:text-white">{c.name}</td>
-                      <td className="p-2.5 text-slate-500">{c.company_name}</td>
-                      <td className="p-2.5 text-slate-400">{c.email} • {c.phone}</td>
-                      <td className="p-2.5 font-bold text-[10px] text-slate-500">{clientStatusLabels[c.status]}</td>
-                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">
-                        {formatBRL(c.total_revenue)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {selectedReport === 'tasks' && (
-          <div className="space-y-4">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Atividades e prazos ({tasks.length} tarefas)
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-semibold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2.5">Tarefa</th>
-                    <th className="p-2.5">Prioridade</th>
-                    <th className="p-2.5">Prazo</th>
-                    <th className="p-2.5">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {tasks.map((t) => (
-                    <tr key={t.id}>
-                      <td className="p-2.5 font-semibold text-slate-900 dark:text-white">{t.title}</td>
-                      <td className="p-2.5 uppercase text-[10px] font-bold text-slate-500">{t.priority}</td>
-                      <td className="p-2.5 text-slate-400">{t.due_date}</td>
-                      <td className="p-2.5 font-bold text-slate-700 dark:text-slate-300 uppercase text-[10px]">{t.status}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {selectedReport === 'projects' && (
-          <div className="space-y-4">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Acompanhamento das projetos ({projects.length} registros)
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-semibold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2.5">Projeto</th>
-                    <th className="p-2.5">Cliente</th>
-                    <th className="p-2.5">Progresso</th>
-                    <th className="p-2.5">Prazo</th>
-                    <th className="p-2.5 text-right">Orçamento</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {projects.map((p) => (
-                    <tr key={p.id}>
-                      <td className="p-2.5 font-semibold text-slate-900 dark:text-white">{p.name}</td>
-                      <td className="p-2.5 text-slate-500">{p.client_name || 'Interno'}</td>
-                      <td className="p-2.5 font-bold text-brand-500">{p.progress}%</td>
-                      <td className="p-2.5 text-slate-400">{p.due_date}</td>
-                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">{formatBRL(p.budget)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </Card>
-    </div>
-  );
+export const Reports:React.FC=()=>{
+ const {company,user}=useAuth(); const {showToast}=useNotification();
+ const [,setRevision]=useState(0); const [kind,setKind]=useState<ReportKind>('overview'); const [period,setPeriod]=useState<Period>('month');
+ const [start,setStart]=useState(()=>getLocalDateISO(new Date(new Date().getFullYear(),new Date().getMonth(),1))); const [end,setEnd]=useState(()=>getLocalDateISO());
+ const [clientId,setClientId]=useState(''); const [projectId,setProjectId]=useState(''); const [category,setCategory]=useState(''); const [status,setStatus]=useState('');
+ const [chartMode,setChartMode]=useState<ChartMode>('monthly'); const [sections,setSections]=useState<ReportSection[]>(allSections); const [analysis,setAnalysis]=useState(''); const [analysisKey,setAnalysisKey]=useState(''); const [analyzing,setAnalyzing]=useState(false);
+ useEffect(()=>dataStore.subscribe(()=>setRevision(v=>v+1)),[]);
+ const clients=dataStore.getClients(); const projects=dataStore.getProjects(); const tasks=dataStore.getTasks(); const transactions=dataStore.getFinancialTransactions();
+ const filters=useMemo<ReportFilters>(()=>({period,startDate:start,endDate:end,clientId,projectId,category,status}),[period,start,end,clientId,projectId,category,status]);
+ const data=useMemo(()=>buildReportAnalytics({transactions,clients,projects,tasks,filters}),[transactions,clients,projects,tasks,filters]);
+ const filterKey=`${kind}:${period}:${start}:${end}:${clientId}:${projectId}:${category}:${status}`;
+ const payload=useMemo<ReportExportPayload>(()=>({kind,sections,company,user,analytics:data,clients:data.clients,projects:data.projects,tasks:data.tasks,analysis:analysisKey===filterKey?analysis:undefined}),[kind,sections,company,user,data,analysis,analysisKey,filterKey]);
+ const visibleProjects=projects.filter(p=>!clientId||p.client_id===clientId); const categories=[...new Set(transactions.map(t=>t.category).filter(Boolean))].sort();
+ const statusOptions=kind==='clients'?[['ativo','Ativo'],['em_negociacao','Em negociação'],['pendente','Pendente'],['inativo','Inativo']]:kind==='projects'?[['planejamento','Planejamento'],['em_andamento','Em andamento'],['pausado','Pausado'],['concluido','Concluído']]:kind==='tasks'?[['backlog','Backlog'],['a_fazer','A fazer'],['em_andamento','Em andamento'],['concluido','Concluído']]:[['pago','Pago/recebido'],['pendente','Pendente'],['atrasado','Em atraso']];
+ const transactionsForKind=kind==='payables'?[...data.pendingReceivables,...data.pendingPayables,...data.overdue].filter((t,i,a)=>a.findIndex(x=>x.id===t.id)===i):data.selectedTransactions;
+ const chooseKind=(value:ReportKind)=>{setKind(value);setSections(kindSections[value]);setStatus('');setAnalysis('');setAnalysisKey('');};
+ const reset=()=>{setPeriod('month');setStart(getLocalDateISO(new Date(new Date().getFullYear(),new Date().getMonth(),1)));setEnd(getLocalDateISO());setClientId('');setProjectId('');setCategory('');setStatus('');};
+ const toggle=(section:ReportSection)=>setSections(current=>current.includes(section)?current.filter(s=>s!==section):[...current,section]);
+ const aiAnalyze=async()=>{
+  setAnalyzing(true);setAnalysis('');
+  try{
+   const facts={periodo:{inicio:data.startDate,fim:data.endDate},comparacao:{inicio:data.previousPeriod.startDate,fim:data.previousPeriod.endDate,receitasRecebidas:data.previousPeriod.revenue,despesasPagas:data.previousPeriod.expenses,resultadoDeCaixa:data.previousPeriod.cashResult},financeiro:{recebido:data.revenue,pago:data.expenses,resultadoDeCaixa:data.cashResult,margemDeCaixaPercentual:data.marginPercentage,aReceber:data.accountsReceivable,aPagar:data.accountsPayable,emAtraso:data.overdueAmount,despesasPorCategoria:data.categoryTotals,receitasPorCliente:Object.entries(data.revenueByClient).sort((a,b)=>b[1]-a[1]).slice(0,8),maioresDespesasPagas:data.paid.slice().sort((a,b)=>b.amount-a.amount).slice(0,8).map(t=>({descricao:t.description,categoria:t.category,valor:t.amount})),lancamentosAtrasados:data.overdue.slice(0,12).map(t=>({descricao:t.description,tipo:t.type,vencimento:t.due_date,valor:t.amount}))},clientes:{total:data.clients.length,ativos:data.activeClients,porSituacao:data.clientStatusTotals},projetos:{emAndamento:data.ongoingProjects,concluidos:data.completedProjects,porSituacao:data.projectStatusTotals},tarefas:{total:data.totalTasks,concluidas:data.completedTasks,taxaConclusao:data.taskCompletionRate,porSituacao:data.taskStatusTotals,atrasadas:data.tasks.filter(t=>t.status!=='concluido'&&t.due_date<data.today).length}};
+   const result=await AIService.analyzeReport(facts);setAnalysis(result);setAnalysisKey(filterKey);
+  }catch(error){showToast(error instanceof Error?error.message:'Não foi possível analisar os dados.','error');}
+  finally{setAnalyzing(false);}
+ };
+ const runPdf=async()=>{try{await exportReportPdf(payload);showToast('PDF empresarial gerado.','success');}catch(error){console.error('Falha na geração do PDF.',error);showToast('Não foi possível gerar o PDF.','error');}};
+ const runExcel=async()=>{try{await exportReportExcel(payload);showToast('Planilha Excel gerada.','success');}catch(error){console.error('Falha na geração da planilha.',error);showToast('Não foi possível gerar o Excel.','error');}};
+ const preview=()=>{if(!openReportPreview(payload))showToast('Permita a abertura da prévia no navegador.','error');}; const print=()=>{if(!openReportPreview(payload,true))showToast('Permita a abertura do relatório no navegador.','error');};
+ const kinds:Array<{id:ReportKind;label:string;icon:React.ReactNode}>=[{id:'overview',label:'Gerencial completo',icon:<BarChart3 className="h-4 w-4"/>},{id:'finance',label:'Financeiro',icon:<CircleDollarSign className="h-4 w-4"/>},{id:'clients',label:'Clientes',icon:<Users className="h-4 w-4"/>},{id:'projects',label:'Projetos',icon:<BriefcaseBusiness className="h-4 w-4"/>},{id:'tasks',label:'Tarefas',icon:<CheckCircle2 className="h-4 w-4"/>},{id:'payables',label:'Pagar e receber',icon:<Wallet className="h-4 w-4"/>}];
+ const charts:Array<{id:ChartMode;label:string}>=[{id:'monthly',label:'Receitas x despesas'},{id:'result',label:'Resultado mensal'},{id:'categories',label:'Despesas por categoria'},{id:'clients',label:'Receita por cliente'},{id:'projects',label:'Situação dos projetos'},{id:'portfolio',label:'Carteira de clientes'},{id:'tasks',label:'Situação das tarefas'},{id:'accounts',label:'Contas por vencimento'}];
+ return <div className="space-y-5 sm:space-y-6">
+  <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl"><BarChart3 className="h-6 w-6 text-brand-500"/>Relatórios & Business Intelligence</h1><p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Indicadores da empresa, análise de caixa e documentos empresariais.</p></div><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><Button variant="outline" size="sm" onClick={preview} leftIcon={<Activity className="h-4 w-4"/>}>Visualizar</Button><Button variant="outline" size="sm" onClick={print} leftIcon={<Printer className="h-4 w-4"/>}>Imprimir</Button><Button variant="outline" size="sm" onClick={()=>exportReportCsv(payload)} leftIcon={<Download className="h-4 w-4"/>}>CSV</Button><Button variant="outline" size="sm" onClick={runExcel} leftIcon={<FileSpreadsheet className="h-4 w-4 text-emerald-500"/>}>Excel (.xlsx)</Button><Button variant="primary" size="sm" onClick={runPdf} leftIcon={<Download className="h-4 w-4"/>}>Baixar PDF</Button></div></header>
+  <Card className="space-y-4 p-4 sm:p-5"><div className="flex items-center justify-between"><div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Filter className="h-4 w-4 text-brand-500"/>Filtros do relatório</div><button onClick={reset} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400"><RefreshCw className="h-3.5 w-3.5"/>Limpar filtros</button></div>
+   <div className="flex gap-1.5 overflow-x-auto pb-1">{periods.map(p=><button key={p.id} onClick={()=>setPeriod(p.id)} className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold ${period===p.id?'bg-brand-500 text-white':'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>{p.label}</button>)}</div>
+   {period==='custom'&&<div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label className="space-y-1 text-xs text-slate-500">Data inicial<input aria-label="Data inicial" type="date" value={start} onChange={e=>setStart(e.target.value)} className={selectClass}/></label><label className="space-y-1 text-xs text-slate-500">Data final<input aria-label="Data final" type="date" min={start} value={end} onChange={e=>setEnd(e.target.value)} className={selectClass}/></label></div>}
+   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <label className="space-y-1 text-xs text-slate-500">Cliente<select aria-label="Filtrar por cliente" value={clientId} onChange={e=>{setClientId(e.target.value);setProjectId('');}} className={selectClass}><option value="">Todos os clientes</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}{c.company_name?` • ${c.company_name}`:''}</option>)}</select></label>
+    <label className="space-y-1 text-xs text-slate-500">Projeto<select aria-label="Filtrar por projeto" value={projectId} onChange={e=>setProjectId(e.target.value)} className={selectClass}><option value="">Todos os projetos</option>{visibleProjects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+    <label className="space-y-1 text-xs text-slate-500">Categoria<select aria-label="Filtrar por categoria" value={category} onChange={e=>setCategory(e.target.value)} className={selectClass}><option value="">Todas as categorias</option>{categories.map(c=><option key={c} value={c}>{c}</option>)}</select></label>
+    <label className="space-y-1 text-xs text-slate-500">Situação<select aria-label="Filtrar por situação" value={status} onChange={e=>setStatus(e.target.value)} className={selectClass}><option value="">Todas</option>{statusOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+   </div><div className="flex items-center gap-2 text-[11px] text-slate-400"><CalendarDays className="h-3.5 w-3.5"/>{date(data.startDate)} a {date(data.endDate)}</div>
+  </Card>
+  <section><h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Fluxo de caixa</h2><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+   <Metric label="Receitas recebidas" value={money(data.revenue)} note={data.previousPeriod.revenueChangePercent===undefined?'Sem base no período anterior':`${data.previousPeriod.revenueChangePercent>0?'+':''}${data.previousPeriod.revenueChangePercent}% vs. período anterior`} color="green" icon={<ArrowUpRight className="h-4 w-4"/>}/><Metric label="Despesas pagas" value={money(data.expenses)} note={data.previousPeriod.expenseChangePercent===undefined?'Sem base no período anterior':`${data.previousPeriod.expenseChangePercent>0?'+':''}${data.previousPeriod.expenseChangePercent}% vs. período anterior`} color="red" icon={<ArrowDownRight className="h-4 w-4"/>}/><Metric label="Resultado financeiro de caixa" value={money(data.cashResult)} note={`Margem de caixa ${data.marginPercentage.toFixed(1)}%${data.previousPeriod.cashResultChangePercent===undefined?'':` • ${data.previousPeriod.cashResultChangePercent>0?'+':''}${data.previousPeriod.cashResultChangePercent}% vs. anterior`}`} color={data.cashResult>=0?'green':'red'} icon={<CircleDollarSign className="h-4 w-4"/>}/><Metric label="Contas a receber" value={money(data.accountsReceivable)} note="Receitas pendentes no período" color="blue" icon={<ArrowUpRight className="h-4 w-4"/>}/><Metric label="Contas a pagar" value={money(data.accountsPayable)} note="Despesas pendentes no período" color="red" icon={<ArrowDownRight className="h-4 w-4"/>}/><Metric label="Valores em atraso" value={money(data.overdueAmount)} note={`${data.overdue.length} lançamentos em aberto vencidos`} color="red" icon={<AlertTriangle className="h-4 w-4"/>}/>
+  </div></section>
+  <section><h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Clientes, projetos e produtividade</h2><div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Metric label="Clientes ativos" value={String(data.activeClients)} note={`${data.clients.length} cliente(s) no filtro`} color="blue" icon={<Users className="h-4 w-4"/>}/><Metric label="Projetos em andamento" value={String(data.ongoingProjects)} note={`${data.completedProjects} concluído(s)`} icon={<BriefcaseBusiness className="h-4 w-4"/>}/><Metric label="Taxa de conclusão das tarefas" value={`${data.taskCompletionRate.toFixed(1)}%`} note={`${data.completedTasks} de ${data.totalTasks} concluídas`} color="green" icon={<CheckCircle2 className="h-4 w-4"/>}/></div></section>
+  <Card className="space-y-3 p-4 sm:p-5"><div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300"><Activity className="h-4 w-4 text-brand-500"/>Gráficos interativos</div><div className="flex gap-1.5 overflow-x-auto pb-1">{charts.map(c=><button key={c.id} onClick={()=>setChartMode(c.id)} className={`shrink-0 rounded-lg px-3 py-2 text-[11px] font-semibold ${chartMode===c.id?'bg-slate-900 text-white dark:bg-brand-500 dark:text-slate-950':'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>{c.label}</button>)}</div></Card>
+  <ChartPanel mode={chartMode} data={data}/>
+  <Card className="space-y-4 p-4 sm:p-5"><div><h2 className="text-sm font-bold text-slate-900 dark:text-white">Preparar documento</h2><p className="mt-1 text-xs text-slate-500">Escolha o modelo e marque as seções incluídas na exportação.</p></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{kinds.map(k=><button key={k.id} onClick={()=>chooseKind(k.id)} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold ${kind===k.id?'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300':'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'}`}>{k.icon}{k.label}</button>)}</div><div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">{allSections.map(s=><label key={s} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"><input type="checkbox" checked={sections.includes(s)} onChange={()=>toggle(s)} className="accent-brand-500"/>{REPORT_SECTION_LABELS[s]}</label>)}</div>
+   <div className="flex flex-col gap-3 rounded-xl border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-900/50 dark:bg-brand-950/20 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-2"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-500"/><div><div className="text-xs font-semibold text-slate-800 dark:text-slate-200">Analisar com Nexus AI</div><p className="mt-1 text-[11px] text-slate-500">Análise consultiva limitada aos indicadores reais deste filtro.</p></div></div><Button variant="outline" size="sm" onClick={aiAnalyze} isLoading={analyzing} leftIcon={<Sparkles className="h-4 w-4 text-brand-500"/>}>{analyzing?'Analisando...':'Analisar com Nexus AI'}</Button></div>
+   {analysis&&analysisKey===filterKey&&<div className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-6 text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><div className="mb-2 flex items-center gap-2 font-bold text-slate-900 dark:text-white"><Sparkles className="h-4 w-4 text-brand-500"/>Análise Nexus AI</div><div className="whitespace-pre-wrap">{analysis}</div><p className="mt-3 text-[10px] text-emerald-600">A análise será incluída no PDF enquanto estes filtros estiverem ativos.</p></div>}
+  </Card>
+  <Card className="overflow-hidden p-0"><div className="flex flex-col gap-2 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:p-5"><div><h2 className="text-sm font-bold text-slate-900 dark:text-white">Prévia dos registros</h2><p className="mt-1 text-xs text-slate-500">{REPORT_KIND_LABELS[kind]} • {kind==='clients'?data.clients.length:kind==='projects'?data.projects.length:kind==='tasks'?data.tasks.length:transactionsForKind.length} registro(s)</p></div><div className="flex flex-wrap gap-1">{sections.map(s=><span key={s} className="rounded-md bg-slate-100 px-2 py-1 text-[9px] text-slate-500 dark:bg-slate-800">{REPORT_SECTION_LABELS[s]}</span>)}</div></div>
+   {kind==='clients'?<div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-500 dark:bg-slate-800/50"><tr><th className="p-3">Cliente</th><th className="p-3">Contato</th><th className="p-3">Status</th><th className="p-3 text-right">Receita registrada</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{data.clients.map(c=><tr key={c.id}><td className="p-3"><b>{c.name}</b><span className="block text-slate-400">{c.company_name}</span></td><td className="p-3 text-slate-500">{c.email} • {c.phone}</td><td className="p-3">{statusLabels[c.status as ClientStatus]}</td><td className="p-3 text-right">{money(c.total_revenue)}</td></tr>)}</tbody></table></div>
+    :kind==='projects'?<div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-500 dark:bg-slate-800/50"><tr><th className="p-3">Projeto</th><th className="p-3">Cliente</th><th className="p-3">Situação / progresso</th><th className="p-3">Prazo</th><th className="p-3 text-right">Orçamento previsto</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{data.projects.map(p=><tr key={p.id}><td className="p-3 font-semibold">{p.name}</td><td className="p-3">{p.client_name||'—'}</td><td className="p-3">{statusLabels[p.status as ProjectStatus]} • {p.progress}%</td><td className="p-3">{date(p.due_date)}</td><td className="p-3 text-right">{money(p.budget)}</td></tr>)}</tbody></table></div>
+    :kind==='tasks'?<div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-500 dark:bg-slate-800/50"><tr><th className="p-3">Tarefa</th><th className="p-3">Projeto</th><th className="p-3">Prioridade</th><th className="p-3">Prazo</th><th className="p-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{data.tasks.map(t=><tr key={t.id}><td className="p-3 font-semibold">{t.title}</td><td className="p-3">{t.project_name||'—'}</td><td className="p-3">{statusLabels[t.priority]||t.priority}</td><td className="p-3">{date(t.due_date)}</td><td className="p-3">{statusLabels[t.status as TaskStatus]}</td></tr>)}</tbody></table></div>
+    :<div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-500 dark:bg-slate-800/50"><tr><th className="p-3">Descrição</th><th className="p-3">Tipo</th><th className="p-3">Cliente / projeto</th><th className="p-3">Categoria</th><th className="p-3">Vencimento</th><th className="p-3">Pagamento</th><th className="p-3">Forma / status</th><th className="p-3 text-right">Valor</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{transactionsForKind.map(t=><tr key={t.id}><td className="p-3 font-semibold">{t.description}</td><td className="p-3">{t.type==='receita'?'Receita':'Despesa'}</td><td className="p-3">{[t.client_name,t.project_name].filter(Boolean).join(' / ')||'—'}</td><td className="p-3">{t.category}</td><td className="p-3">{date(t.due_date)}</td><td className="p-3">{date(t.payment_date)}</td><td className="p-3">{t.payment_method||'—'}<span className="block text-slate-400">{statusLabels[t.status as TransactionStatus]}</span></td><td className="p-3 text-right font-semibold">{money(t.amount)}</td></tr>)}</tbody></table></div>}
+   {((kind==='clients'&&!data.clients.length)||(kind==='projects'&&!data.projects.length)||(kind==='tasks'&&!data.tasks.length)||(!['clients','projects','tasks'].includes(kind)&&!transactionsForKind.length))&&<div className="p-10 text-center text-sm text-slate-400">Nenhum registro encontrado com estes filtros.</div>}
+   <div className="flex flex-col gap-1 border-t border-slate-100 px-4 py-3 text-[10px] text-slate-400 dark:border-slate-800 sm:flex-row sm:justify-between"><span>Valores em reais • Resultado financeiro exibido como fluxo de caixa</span><span>{company?.name||'NEXUS AI'} • {date(data.startDate)} a {date(data.endDate)}</span></div>
+  </Card>
+ </div>;
 };

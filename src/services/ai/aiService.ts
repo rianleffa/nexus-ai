@@ -22,6 +22,12 @@ async function invokeAssistant(body: Record<string, unknown>): Promise<Assistant
 }
 
 export class AIService {
+  public static async analyzeReport(reportData: Record<string, unknown>): Promise<string> {
+    const response = await invokeAssistant({ action: 'analyze_report', reportData });
+    if (!response.text) throw new Error('O Nexus AI não retornou uma análise utilizável. Tente novamente.');
+    return response.text;
+  }
+
   public static async processMessage(userText: string, history: ChatMessage[] = [], pageContext?: string): Promise<ChatMessage> {
     const text = userText.trim();
     if (!text) throw new Error('Digite uma mensagem para continuar.');

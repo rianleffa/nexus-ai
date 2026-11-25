@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --test supabase/functions/gemini/validation.test.mjs supabase/functions/gemini/backend.test.cjs",
+    "test": "node --experimental-strip-types --test supabase/functions/gemini/validation.test.mjs supabase/functions/gemini/backend.test.cjs src/services/reportAnalytics.test.mjs src/services/reportExport.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,10 +15,12 @@
     "@types/canvas-confetti": "^1.9.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.47.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

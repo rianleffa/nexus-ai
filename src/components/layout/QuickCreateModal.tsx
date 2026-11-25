@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { ClientStatusSelect } from '../ui/ClientStatusSelect';
 import {
   Users,
-  Workflow,
+  FolderKanban,
   CheckSquare,
   Calendar,
   TrendingUp,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react';
 import { dataStore } from '../../services/dataStore';
 import { useNotification } from '../../contexts/NotificationContext';
-import { TaskPriority, TransactionCategory } from '../../types';
+import { ClientStatus, TaskPriority, TransactionCategory } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { addDaysToLocalDateISO, getLocalDateISO } from '../../utils/dates';
 
@@ -36,6 +37,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   defaultTab = 'client',
 }) => {
   const [activeTab, setActiveTab] = useState<QuickCreateTab>(defaultTab);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const { showToast } = useNotification();
   const { user } = useAuth();
 
@@ -44,6 +47,24 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       setActiveTab(defaultTab);
     }
   }, [isOpen, defaultTab]);
+
+  const guardSubmit = (handler: (event: React.FormEvent<HTMLFormElement>) => void) =>
+    (event: React.FormEvent<HTMLFormElement>) => {
+      if (submittingRef.current) {
+        event.preventDefault();
+        return;
+      }
+      submittingRef.current = true;
+      setIsSubmitting(true);
+      try {
+        handler(event);
+      } catch {
+        showToast('Não foi possível salvar. Revise os dados e tente novamente.', 'error');
+      } finally {
+        submittingRef.current = false;
+        setIsSubmitting(false);
+      }
+    };
 
   const clients = dataStore.getClients();
   const projects = dataStore.getProjects();
@@ -55,7 +76,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [clientPhone, setClientPhone] = useState('');
   const [clientDoc, setClientDoc] = useState('');
   const [clientAddress, setClientAddress] = useState('');
-  const [clientStatus, setClientStatus] = useState<'ativo' | 'prospect' | 'inativo'>('ativo');
+  const [clientStatus, setClientStatus] = useState<ClientStatus>('ativo');
 
   // 2. Project Form
   const [projName, setProjName] = useState('');
@@ -100,7 +121,10 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   // Handlers
   const handleCreateClient = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName || !clientCompany || !clientEmail) return;
+    if (!clientName.trim() || !clientCompany.trim() || !clientEmail.trim()) {
+      showToast('Preencha nome, empresa e e-mail do cliente.', 'warning');
+      return;
+    }
     const c = dataStore.createClient({
       name: clientName,
       company_name: clientCompany,
@@ -130,7 +154,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     const p = dataStore.createProject({
       name: projName,
       client_id: client?.id,
-      client_name: client?.name || 'Operação interna',
+      client_name: client?.name || 'Projeto interno',
       lead_user_id: user?.id,
       budget: projectBudget,
       due_date: projDueDate,
@@ -139,7 +163,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       progress: 0,
       status: 'em_andamento',
     });
-    showToast(`Operação "${p.name}" criada com sucesso!`, 'success');
+    showToast(`Projeto "${p.name}" criado com sucesso!`, 'success');
     setProjName('');
     setProjBudget('');
     setProjDescription('');
@@ -209,7 +233,10 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const handleCreateRevenue = (e: React.FormEvent) => {
     e.preventDefault();
     const num = parseFloat(revAmount);
-    if (!revDesc || isNaN(num) || num <= 0) return;
+    if (!revDesc.trim() || !Number.isFinite(num) || num <= 0) {
+      showToast('Informe uma descrição e um valor de receita maior que zero.', 'warning');
+      return;
+    }
     const client = clients.find((c) => c.id === revClientId);
 
     dataStore.createFinancialTransaction({
@@ -233,7 +260,10 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const handleCreateExpense = (e: React.FormEvent) => {
     e.preventDefault();
     const num = parseFloat(expAmount);
-    if (!expDesc || isNaN(num) || num <= 0) return;
+    if (!expDesc.trim() || !Number.isFinite(num) || num <= 0) {
+      showToast('Informe uma descrição e um valor de despesa maior que zero.', 'warning');
+      return;
+    }
 
     dataStore.createFinancialTransaction({
       type: 'despesa',
@@ -253,7 +283,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
 
   const tabs: { id: QuickCreateTab; label: string; icon: React.ReactNode }[] = [
     { id: 'client', label: 'Cliente', icon: <Users className="w-3.5 h-3.5" /> },
-    { id: 'project', label: 'Operação', icon: <Workflow className="w-3.5 h-3.5" /> },
+    { id: 'project', label: 'Projeto', icon: <FolderKanban className="w-3.5 h-3.5" /> },
     { id: 'task', label: 'Tarefa', icon: <CheckSquare className="w-3.5 h-3.5" /> },
     { id: 'event', label: 'Agenda', icon: <Calendar className="w-3.5 h-3.5" /> },
     { id: 'revenue', label: 'Receita', icon: <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> },
@@ -289,7 +319,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
 
       {/* 1. NOVO CLIENTE */}
       {activeTab === 'client' && (
-        <form onSubmit={handleCreateClient} className="space-y-3.5">
+        <form onSubmit={guardSubmit(handleCreateClient)} className="space-y-3.5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Nome Completo *" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex: João da Silva" />
             <Input label="Empresa / Razão Social *" required value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} placeholder="Ex: Silva & Filhos Ltda" />
@@ -302,29 +332,21 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
             <Input label="CPF ou CNPJ" value={clientDoc} onChange={(e) => setClientDoc(e.target.value)} placeholder="Informe o CPF ou CNPJ" />
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Status Inicial</label>
-              <select
-                value={clientStatus}
-                onChange={(e) => setClientStatus(e.target.value as any)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
-              >
-                <option value="ativo">Ativo</option>
-                <option value="prospect">Prospect</option>
-                <option value="inativo">Inativo</option>
-              </select>
+              <ClientStatusSelect value={clientStatus} onChange={setClientStatus} />
             </div>
           </div>
           <Input label="Endereço (Opcional)" value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} placeholder="Av. Paulista, 1000 - São Paulo/SP" />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-            <Button variant="primary" type="submit">Cadastrar Cliente</Button>
+            <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Cadastrar Cliente'}</Button>
           </div>
         </form>
       )}
 
-      {/* 2. NOVA OPERAÇÃO */}
+      {/* 2. NOVO PROJETO */}
       {activeTab === 'project' && (
-        <form onSubmit={handleCreateProject} className="space-y-3.5">
-          <Input label="Nome da operação *" required value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="Ex: Expansão da capacidade de atendimento" />
+        <form onSubmit={guardSubmit(handleCreateProject)} className="space-y-3.5">
+          <Input label="Nome do projeto *" required value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="Ex: Expansão da capacidade de atendimento" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Cliente Vinculado</label>
@@ -341,11 +363,11 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                 ))}
               </select>
             </div>
-            <Input label="Recursos previstos (R$)" type="number" step="0.01" min="0" value={projBudget} onChange={(e) => setProjBudget(e.target.value)} placeholder="0,00" />
+            <Input label="Orçamento previsto (R$)" type="number" step="0.01" min="0" value={projBudget} onChange={(e) => setProjBudget(e.target.value)} placeholder="0,00" />
           </div>
-          <Input label="Prazo Final de Entrega *" type="date" required value={projDueDate} onChange={(e) => setProjDueDate(e.target.value)} />
+          <Input label="Prazo de entrega *" type="date" required value={projDueDate} onChange={(e) => setProjDueDate(e.target.value)} />
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Descrição do Escopo</label>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Descrição do projeto</label>
             <textarea
               rows={2}
               value={projDescription}
@@ -356,14 +378,14 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-            <Button variant="primary" type="submit">Criar operação</Button>
+            <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Criar projeto'}</Button>
           </div>
         </form>
       )}
 
       {/* 3. NOVA TAREFA */}
       {activeTab === 'task' && (
-        <form onSubmit={handleCreateTask} className="space-y-3.5">
+        <form onSubmit={guardSubmit(handleCreateTask)} className="space-y-3.5">
           <Input label="Título da Tarefa *" required value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Ex: Enviar proposta comercial" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -380,7 +402,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Operação vinculada</label>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Projeto vinculado</label>
               <select
                 value={taskProjectId}
                 onChange={(e) => {
@@ -391,7 +413,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                 }}
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
               >
-                <option value="">Nenhuma operação (geral)</option>
+                <option value="">Nenhum projeto (geral)</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -416,14 +438,14 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-            <Button variant="primary" type="submit">Salvar Tarefa</Button>
+            <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Salvar Tarefa'}</Button>
           </div>
         </form>
       )}
 
       {/* 4. NOVO COMPROMISSO */}
       {activeTab === 'event' && (
-        <form onSubmit={handleCreateEvent} className="space-y-3.5">
+        <form onSubmit={guardSubmit(handleCreateEvent)} className="space-y-3.5">
           <Input label="Título do Compromisso *" required value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} placeholder="Ex: Reunião de Alinhamento" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -441,7 +463,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
             </div>
             <Input label="Localização / Link" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} placeholder="Google Meet ou Endereço" />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input label="Data *" type="date" required value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
             <Input label="Horário *" type="time" required value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
             <div>
@@ -461,14 +483,14 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-            <Button variant="primary" type="submit">Agendar Compromisso</Button>
+            <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Agendar Compromisso'}</Button>
           </div>
         </form>
       )}
 
       {/* 5. NOVA RECEITA */}
       {activeTab === 'revenue' && (
-        <form onSubmit={handleCreateRevenue} className="space-y-3.5">
+        <form onSubmit={guardSubmit(handleCreateRevenue)} className="space-y-3.5">
           <Input label="Descrição do Recebimento *" required value={revDesc} onChange={(e) => setRevDesc(e.target.value)} placeholder="Ex: Mensalidade Consultoria ou Parcela 01" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Valor (R$) *" type="number" step="0.01" required value={revAmount} onChange={(e) => setRevAmount(e.target.value)} placeholder="3500.00" />
@@ -486,7 +508,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Categoria</label>
               <select
@@ -514,14 +536,14 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-            <Button variant="primary" type="submit">Salvar Receita</Button>
+            <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Salvar Receita'}</Button>
           </div>
         </form>
       )}
 
       {/* 6. NOVA DESPESA */}
       {activeTab === 'expense' && (
-        <form onSubmit={handleCreateExpense} className="space-y-3.5">
+        <form onSubmit={guardSubmit(handleCreateExpense)} className="space-y-3.5">
           <Input label="Descrição do Pagamento *" required value={expDesc} onChange={(e) => setExpDesc(e.target.value)} placeholder="Ex: Servidores Nuvem AWS ou Folha" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Valor (R$) *" type="number" step="0.01" required value={expAmount} onChange={(e) => setExpAmount(e.target.value)} placeholder="1250.00" />
@@ -556,7 +578,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-            <Button variant="primary" type="submit">Salvar Despesa</Button>
+            <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Salvar Despesa'}</Button>
           </div>
         </form>
       )}

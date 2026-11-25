@@ -25,6 +25,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { ClientStatusSelect } from '../components/ui/ClientStatusSelect';
 import { ClientStatusBadge, Badge, ProjectStatusBadge, TaskPriorityBadge } from '../components/ui/Badge';
 import { dataStore } from '../services/dataStore';
 import { Client, ClientStatus } from '../types';
@@ -32,16 +33,18 @@ import { useNotification } from '../contexts/NotificationContext';
 
 interface ClientsProps {
   initialClientId?: string;
+  initialFilter?: ClientStatus;
   onNavigate?: (page: string, prompt?: string, params?: Record<string, any>) => void;
 }
 
 export const Clients: React.FC<ClientsProps> = ({
   initialClientId,
+  initialFilter,
   onNavigate,
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | ClientStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | ClientStatus>(initialFilter || 'all');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [clientDraft, setClientDraft] = useState({
@@ -123,7 +126,8 @@ export const Clients: React.FC<ClientsProps> = ({
   });
 
   const activeCount = clients.filter((c) => c.status === 'ativo').length;
-  const prospectCount = clients.filter((c) => c.status === 'prospect').length;
+  const negotiationCount = clients.filter((c) => c.status === 'em_negociacao').length;
+  const pendingCount = clients.filter((c) => c.status === 'pendente').length;
   const inactiveCount = clients.filter((c) => c.status === 'inativo').length;
 
   const handleDelete = (id: string, clientName: string) => {
@@ -264,11 +268,11 @@ export const Clients: React.FC<ClientsProps> = ({
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Workflow className="w-4 h-4 text-brand-500" />
-                  <span>Operações em andamento ({clientProjects.length})</span>
+                  <span>Projetos em andamento ({clientProjects.length})</span>
                 </h3>
               </div>
               {clientProjects.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Nenhuma operação vinculada a este cliente.</p>
+                <p className="text-xs text-slate-400 py-4 text-center">Nenhuma projeto vinculada a este cliente.</p>
               ) : (
                 <div className="space-y-2.5">
                   {clientProjects.map((p) => (
@@ -404,14 +408,14 @@ export const Clients: React.FC<ClientsProps> = ({
                 Clientes & CRM
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Centralize seus contatos e acompanhe as operações da empresa
+                Centralize seus contatos e acompanhe os projetos da empresa
               </p>
             </div>
 
           </div>
 
           {/* Quick Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3.5">
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                 Total de Clientes
@@ -430,10 +434,18 @@ export const Clients: React.FC<ClientsProps> = ({
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
               <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
-                Prospects
+                Em negociação
               </span>
               <span className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1 block">
-                {prospectCount}
+                {negotiationCount}
+              </span>
+            </div>
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
+                Pendentes
+              </span>
+              <span className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1 block">
+                {pendingCount}
               </span>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
@@ -459,7 +471,7 @@ export const Clients: React.FC<ClientsProps> = ({
               />
             </div>
 
-            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/70 p-1 rounded-xl self-start sm:self-auto text-xs">
+            <div className="flex max-w-full items-center gap-1.5 overflow-x-auto bg-slate-100 dark:bg-slate-800/70 p-1 rounded-xl self-start sm:self-auto text-xs">
               <button
                 onClick={() => setStatusFilter('all')}
                 className={`px-3 py-1 rounded-lg font-medium transition-all ${
@@ -481,14 +493,24 @@ export const Clients: React.FC<ClientsProps> = ({
                 Ativos
               </button>
               <button
-                onClick={() => setStatusFilter('prospect')}
+                onClick={() => setStatusFilter('em_negociacao')}
                 className={`px-3 py-1 rounded-lg font-medium transition-all ${
-                  statusFilter === 'prospect'
+                  statusFilter === 'em_negociacao'
                     ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
-                Prospects
+                Em negociação
+              </button>
+              <button
+                onClick={() => setStatusFilter('pendente')}
+                className={`px-3 py-1 rounded-lg font-medium transition-all ${
+                  statusFilter === 'pendente'
+                    ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Pendentes
               </button>
               <button
                 onClick={() => setStatusFilter('inativo')}
@@ -587,15 +609,10 @@ export const Clients: React.FC<ClientsProps> = ({
             <Input label="Endereço" value={clientDraft.address} onChange={(event) => setClientDraft({ ...clientDraft, address: event.target.value })} />
             <label className="space-y-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
               Situação
-              <select
+              <ClientStatusSelect
                 value={clientDraft.status}
-                onChange={(event) => setClientDraft({ ...clientDraft, status: event.target.value as ClientStatus })}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="ativo">Ativo</option>
-                <option value="prospect">Prospect</option>
-                <option value="inativo">Inativo</option>
-              </select>
+                onChange={(status) => setClientDraft({ ...clientDraft, status })}
+              />
             </label>
           </div>
           <label className="block space-y-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">

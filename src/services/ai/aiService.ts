@@ -15,7 +15,6 @@ async function invokeAssistant(body: Record<string, unknown>): Promise<Assistant
   if (!isSupabaseConfigured || !supabase) throw new Error('Não foi possível conectar ao assistente. Tente novamente.');
   const { data, error } = await supabase.functions.invoke('gemini', { body, signal: AbortSignal.timeout(35_000) });
   if (error) {
-    console.error('[nexus-ai] Falha ao conectar ao assistente:', error.message);
     throw new Error('Não foi possível conectar ao assistente. Tente novamente.');
   }
   if (!data?.success) throw new Error('Não foi possível concluir a operação. Tente novamente.');
@@ -23,7 +22,7 @@ async function invokeAssistant(body: Record<string, unknown>): Promise<Assistant
 }
 
 export class AIService {
-  public static async processMessage(userText: string, history: ChatMessage[] = []): Promise<ChatMessage> {
+  public static async processMessage(userText: string, history: ChatMessage[] = [], pageContext?: string): Promise<ChatMessage> {
     const text = userText.trim();
     if (!text) throw new Error('Digite uma mensagem para continuar.');
     const priorHistory = history.at(-1)?.sender === 'user' && history.at(-1)?.content === text
@@ -33,6 +32,7 @@ export class AIService {
       action: 'chat',
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       message: text,
+      pageContext,
       history: priorHistory.slice(-12).map(({ sender, content }) => ({ sender, content })),
     });
     if (!response.text) throw new Error('O Gemini retornou uma resposta vazia. Tente novamente.');

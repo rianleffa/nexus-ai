@@ -24,8 +24,7 @@ export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
     try {
       await onConfirm();
       setIsResolved('confirmed');
-    } catch (e) {
-      console.error(e);
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -37,8 +36,7 @@ export const AIConfirmationCard: React.FC<AIConfirmationCardProps> = ({
     try {
       await onCancel();
       setIsResolved('cancelled');
-    } catch (error) {
-      console.error(error);
+    } catch {
     } finally {
       setIsLoading(false);
     }

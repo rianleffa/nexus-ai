@@ -47,24 +47,24 @@ const automaticWriteTools = new Set<ToolName>([
 
 const declarations = [
   { name: 'create_client_and_meeting', description: 'Cadastra o cliente (se não existir) e agenda a reunião vinculada em uma única transação ao receber um pedido explícito. Nome, data e horário obrigatórios; se faltar algum dado, pergunte antes de chamar. Não peça confirmação adicional para esse pedido claro.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, email: { type: 'STRING' }, phone: { type: 'STRING' }, title: { type: 'STRING' }, description: { type: 'STRING' }, event_date: { type: 'STRING' }, start_time: { type: 'STRING' } }, required: ['name','event_date','start_time'] } },
-  { name: 'get_clients', description: 'Consulta clientes cadastrados, opcionalmente por nome ou status.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' }, status: { type: 'STRING', enum: ['ativo', 'inativo', 'prospect'] } } } },
+  { name: 'get_clients', description: 'Consulta clientes cadastrados, opcionalmente por nome ou status.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' }, status: { type: 'STRING', description: 'Use Ativo como padrão; mapeie Em negociação para em_negociacao, Pendente para pendente e Inativo para inativo.', enum: ['ativo', 'em_negociacao', 'pendente', 'inativo'] } } } },
   { name: 'get_client', description: 'Consulta um cliente específico pelo nome ou UUID.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' } }, required: ['query'] } },
-  { name: 'get_projects', description: 'Consulta operações (incluindo projetos existentes) da empresa.', parameters: { type: 'OBJECT', properties: { status: { type: 'STRING', enum: ['planejamento', 'em_andamento', 'pausado', 'concluido'] }, query: { type: 'STRING' } } } },
+  { name: 'get_projects', description: 'Consulta projetos da empresa.', parameters: { type: 'OBJECT', properties: { status: { type: 'STRING', enum: ['planejamento', 'em_andamento', 'pausado', 'concluido'] }, query: { type: 'STRING' } } } },
   { name: 'get_tasks', description: 'Consulta tarefas da empresa, incluindo as atrasadas.', parameters: { type: 'OBJECT', properties: { status: { type: 'STRING', enum: ['backlog', 'a_fazer', 'em_andamento', 'concluido'] }, pending_only: { type: 'BOOLEAN', description: 'Inclui todas as tarefas não concluídas; use para pendentes, sem filtrar status.' }, overdue_only: { type: 'BOOLEAN' }, query: { type: 'STRING' } } } },
   { name: 'get_calendar_events', description: 'Consulta compromissos da agenda, podendo filtrar por data, título ou cliente.', parameters: { type: 'OBJECT', properties: { date: { type: 'STRING', description: 'Data no formato YYYY-MM-DD.' }, query: { type: 'STRING' }, client_name: { type: 'STRING' } } } },
   { name: 'get_financial_transactions', description: 'Consulta receitas e despesas; use para responder perguntas financeiras.', parameters: { type: 'OBJECT', properties: { type: { type: 'STRING', enum: ['receita', 'despesa'] }, status: { type: 'STRING', enum: ['pago', 'pendente', 'atrasado'] }, month: { type: 'STRING', description: 'Mês no formato YYYY-MM.' } } } },
   { name: 'get_dashboard_summary', description: 'Consulta indicadores consolidados da empresa.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'get_my_day', description: 'Consulta tarefas atrasadas e de hoje, compromissos de hoje e lançamentos financeiros pendentes.', parameters: { type: 'OBJECT', properties: {} } },
-  { name: 'get_clients_needing_attention', description: 'Lista prospects e clientes inativos que podem exigir acompanhamento.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'get_clients_needing_attention', description: 'Lista clientes em negociação, pendentes e inativos que podem exigir acompanhamento.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'get_documents', description: 'Pesquisa documentos já enviados à empresa por nome/título e categoria.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' }, category: { type: 'STRING' } } } },
-  { name: 'create_client', description: 'Cadastra um cliente quando o usuário solicitar explicitamente. Apenas name é obrigatório; não exija email, telefone ou documento quando o usuário informar somente o nome.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, company_name: { type: 'STRING' }, email: { type: 'STRING' }, phone: { type: 'STRING' }, document: { type: 'STRING' }, notes: { type: 'STRING' } }, required: ['name'] } },
-  { name: 'update_client', description: 'Atualiza os dados de um único cliente identificado sem ambiguidade por nome, e-mail ou UUID após pedido explícito, sem confirmação adicional para alterações simples.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nome, e-mail ou UUID do cliente.' }, name: { type: 'STRING' }, company_name: { type: 'STRING' }, email: { type: 'STRING' }, phone: { type: 'STRING' }, document: { type: 'STRING' }, notes: { type: 'STRING' }, status: { type: 'STRING', enum: ['ativo', 'inativo', 'prospect'] } }, required: ['query'] } },
+  { name: 'create_client', description: 'Cadastra um cliente quando o usuário solicitar explicitamente. Apenas name é obrigatório; email, telefone e documento são opcionais. Use status ativo por padrão e os status em_negociacao, pendente ou inativo somente quando o usuário informar.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, company_name: { type: 'STRING' }, email: { type: 'STRING' }, phone: { type: 'STRING' }, document: { type: 'STRING' }, notes: { type: 'STRING' }, status: { type: 'STRING', description: 'Use Ativo como padrão; mapeie Em negociação para em_negociacao, Pendente para pendente e Inativo para inativo.', enum: ['ativo', 'em_negociacao', 'pendente', 'inativo'] } }, required: ['name'] } },
+  { name: 'update_client', description: 'Atualiza os dados de um único cliente identificado sem ambiguidade por nome, e-mail ou UUID após pedido explícito, sem confirmação adicional para alterações simples.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nome, e-mail ou UUID do cliente.' }, name: { type: 'STRING' }, company_name: { type: 'STRING' }, email: { type: 'STRING' }, phone: { type: 'STRING' }, document: { type: 'STRING' }, notes: { type: 'STRING' }, status: { type: 'STRING', description: 'Use Ativo como padrão; mapeie Em negociação para em_negociacao, Pendente para pendente e Inativo para inativo.', enum: ['ativo', 'em_negociacao', 'pendente', 'inativo'] } }, required: ['query'] } },
   { name: 'delete_client', description: 'Exclui um cliente somente após confirmação explícita. Use nome ou UUID; peça mais detalhes se houver homônimos.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' } }, required: ['query'] } },
-  { name: 'create_project', description: 'Cadastra uma operação (projeto) após pedido explícito e claro, sem confirmação adicional. O nome é obrigatório; pergunte se estiver faltando.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, client_name: { type: 'STRING' }, description: { type: 'STRING' }, budget: { type: 'NUMBER' }, due_date: { type: 'STRING' } }, required: ['name'] } },
-  { name: 'update_project', description: 'Atualiza uma operação existente identificada sem ambiguidade pelo nome ou UUID, sem confirmação adicional para uma alteração simples e explícita.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nome ou UUID da operação.' }, name: { type: 'STRING' }, client_name: { type: 'STRING' }, description: { type: 'STRING' }, budget: { type: 'NUMBER' }, progress: { type: 'INTEGER' }, status: { type: 'STRING', enum: ['planejamento', 'em_andamento', 'pausado', 'concluido'] }, due_date: { type: 'STRING' } }, required: ['query'] } },
-  { name: 'delete_project', description: 'Exclui uma operação (projeto) somente após confirmação explícita. Use nome ou UUID.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' } }, required: ['query'] } },
-  { name: 'create_task', description: 'Cria uma tarefa após pedido explícito e claro, sem confirmação adicional. Título e prazo são obrigatórios; pergunte se faltar algum.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, description: { type: 'STRING' }, priority: { type: 'STRING', enum: ['baixa', 'media', 'alta', 'urgente'] }, due_date: { type: 'STRING' }, client_name: { type: 'STRING' }, project_name: { type: 'STRING', description: 'Nome da operação vinculada, se houver.' } }, required: ['title', 'due_date'] } },
-  { name: 'update_task', description: 'Atualiza uma tarefa identificada sem ambiguidade por título ou UUID após pedido explícito e claro, sem confirmação adicional para alterações simples.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Título ou UUID da tarefa.' }, title: { type: 'STRING' }, description: { type: 'STRING' }, priority: { type: 'STRING', enum: ['baixa', 'media', 'alta', 'urgente'] }, status: { type: 'STRING', enum: ['backlog', 'a_fazer', 'em_andamento', 'concluido'] }, due_date: { type: 'STRING', description: 'Data no formato YYYY-MM-DD.' }, client_name: { type: 'STRING' }, project_name: { type: 'STRING', description: 'Nome da operação vinculada, se houver.' } }, required: ['query'] } },
+  { name: 'create_project', description: 'Cadastra um projeto após pedido explícito e claro, sem confirmação adicional. O nome é obrigatório; pergunte se estiver faltando.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, client_name: { type: 'STRING' }, description: { type: 'STRING' }, budget: { type: 'NUMBER' }, due_date: { type: 'STRING' } }, required: ['name'] } },
+  { name: 'update_project', description: 'Atualiza um projeto existente identificada sem ambiguidade pelo nome ou UUID, sem confirmação adicional para uma alteração simples e explícita.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Nome ou UUID do projeto.' }, name: { type: 'STRING' }, client_name: { type: 'STRING' }, description: { type: 'STRING' }, budget: { type: 'NUMBER' }, progress: { type: 'INTEGER' }, status: { type: 'STRING', enum: ['planejamento', 'em_andamento', 'pausado', 'concluido'] }, due_date: { type: 'STRING' } }, required: ['query'] } },
+  { name: 'delete_project', description: 'Exclui um projeto somente após confirmação explícita. Use nome ou UUID.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' } }, required: ['query'] } },
+  { name: 'create_task', description: 'Cria uma tarefa após pedido explícito e claro, sem confirmação adicional. Título e prazo são obrigatórios; pergunte se faltar algum.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, description: { type: 'STRING' }, priority: { type: 'STRING', enum: ['baixa', 'media', 'alta', 'urgente'] }, due_date: { type: 'STRING' }, client_name: { type: 'STRING' }, project_name: { type: 'STRING', description: 'Nome do projeto vinculado, se houver.' } }, required: ['title', 'due_date'] } },
+  { name: 'update_task', description: 'Atualiza uma tarefa identificada sem ambiguidade por título ou UUID após pedido explícito e claro, sem confirmação adicional para alterações simples.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'Título ou UUID da tarefa.' }, title: { type: 'STRING' }, description: { type: 'STRING' }, priority: { type: 'STRING', enum: ['baixa', 'media', 'alta', 'urgente'] }, status: { type: 'STRING', enum: ['backlog', 'a_fazer', 'em_andamento', 'concluido'] }, due_date: { type: 'STRING', description: 'Data no formato YYYY-MM-DD.' }, client_name: { type: 'STRING' }, project_name: { type: 'STRING', description: 'Nome do projeto vinculado, se houver.' } }, required: ['query'] } },
   { name: 'delete_task', description: 'Exclui uma tarefa somente após confirmação explícita. Use título ou UUID.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' } }, required: ['query'] } },
   { name: 'create_calendar_event', description: 'Agenda um compromisso após pedido explícito e claro, sem confirmação adicional. Cliente é opcional. Se a pessoa indicada não estiver cadastrada, pergunte se prefere cadastrá-la ou agendar sem vínculo.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, description: { type: 'STRING' }, event_type: { type: 'STRING', enum: ['reuniao', 'ligacao', 'tarefa', 'compromisso', 'outro'] }, participant_name: { type: 'STRING', description: 'Use somente quando o texto do usuário pedir explicitamente reunião sem vínculo com cliente.' }, event_date: { type: 'STRING' }, start_time: { type: 'STRING' }, duration_minutes: { type: 'INTEGER' }, client_name: { type: 'STRING', description: 'Use para o nome da pessoa citada em “com Nome”; o servidor verifica o cadastro antes de agendar.' }, location: { type: 'STRING' } }, required: ['title', 'event_date', 'start_time'] } },
   { name: 'create_financial_transaction', description: 'Registra receita ou despesa após confirmação explícita.', parameters: { type: 'OBJECT', properties: { type: { type: 'STRING', enum: ['receita', 'despesa'] }, description: { type: 'STRING' }, amount: { type: 'NUMBER' }, category: { type: 'STRING', description: 'Opcional. Se não informada, use Outros.' }, due_date: { type: 'STRING' }, status: { type: 'STRING', enum: ['pago', 'pendente', 'atrasado'] }, client_name: { type: 'STRING' } }, required: ['type', 'description', 'amount', 'due_date'] } },
@@ -274,7 +274,8 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
         if (overdue.length) return [{ client, reason: `${overdue.length} tarefa(s) atrasada(s): “${overdue[0].title}”`, urgency: 'alta', badgeText: 'Tarefa Atrasada' }];
         const pending = (transactions.data || []).filter((row) => row.client_id === client.id);
         if (pending.length) return [{ client, reason: `R$ ${pending.reduce((sum: number, row: any) => sum + Number(row.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em recebimentos pendentes`, urgency: 'media', badgeText: 'Cobrança Pendente' }];
-        if (client.status === 'prospect') return [{ client, reason: 'Prospect aguardando proposta ou alinhamento comercial', urgency: 'media', badgeText: 'Prospect' }];
+        if (client.status === 'em_negociacao') return [{ client, reason: 'Cliente em negociação aguardando proposta ou alinhamento comercial', urgency: 'media', badgeText: 'Em negociação' }];
+        if (client.status === 'pendente') return [{ client, reason: 'Cadastro pendente de atualização ou validação', urgency: 'media', badgeText: 'Pendente' }];
         if (client.status === 'inativo') return [{ client, reason: 'Cliente sem novas interações ou contratações recentes', urgency: 'baixa', badgeText: 'Sem Atividade' }];
         return [];
       }); break;
@@ -352,14 +353,16 @@ async function executeTool(db: SupabaseClient, companyId: string, userId: string
     }
     case 'create_client': {
       table = 'clients'; const name = clean(args.name, 255); if (!name) fail('Informe o nome do cliente.');
-      const result = await db.from(table).insert({ company_id: companyId, user_id: userId, name, company_name: clean(args.company_name, 255) || null, email: clean(args.email, 255) || null, phone: clean(args.phone, 50) || null, document: clean(args.document, 50) || null, notes: clean(args.notes, 2000) || null, status: 'ativo' }).select('id,name,company_name,email,phone,status').single();
+      const status = args.status === undefined ? 'ativo' : String(args.status);
+      if (!['ativo', 'em_negociacao', 'pendente', 'inativo'].includes(status)) fail('Informe um status válido para o cliente.');
+      const result = await db.from(table).insert({ company_id: companyId, user_id: userId, name, company_name: clean(args.company_name, 255) || null, email: clean(args.email, 255) || null, phone: clean(args.phone, 50) || null, document: clean(args.document, 50) || null, notes: clean(args.notes, 2000) || null, status }).select('id,name,company_name,email,phone,status').single();
       if (result.error) throw result.error; data = result.data; break;
     }
     case 'update_client': {
       table = 'clients'; const found = await findClientId(db, companyId, args.query); if (!found) throw new BusinessRuleError('Não encontrei esse cliente na sua empresa. Informe o nome completo ou consulte a lista de clientes.');
       const updates: Record<string, unknown> = {}; for (const key of ['name','company_name','email','phone','document','notes','status']) if (args[key] !== undefined) updates[key] = key === 'status' ? args[key] : clean(args[key], key === 'notes' ? 2000 : 255);
       if (!Object.keys(updates).length) fail('Informe ao menos um campo para atualizar.');
-      if (updates.status !== undefined && !['ativo', 'inativo', 'prospect'].includes(String(updates.status))) fail('Informe um status válido para o cliente.');
+      if (updates.status !== undefined && !['ativo', 'em_negociacao', 'pendente', 'inativo'].includes(String(updates.status))) fail('Informe um status válido para o cliente.');
       const result = await db.from(table).update(updates).eq('company_id', companyId).eq('id', found.id).select('id,name,company_name,email,phone,status').single();
       if (result.error) throw result.error; data = result.data; break;
     }
@@ -564,9 +567,13 @@ function saoPauloDate(timeZone = 'America/Sao_Paulo') {
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
 }
+const clientStatusText = (status: unknown) => ({
+  ativo: 'Ativo', em_negociacao: 'Em negociação', pendente: 'Pendente', inativo: 'Inativo',
+}[String(status)] || 'Inativo');
+
 function describe(tool: ToolName, result: any) {
   if (tool === 'create_client_and_meeting') return `${result.data.client.created ? 'Cliente cadastrado' : 'Cliente existente reutilizado'}: ${result.data.client.name}. Reunião gravada em ${result.data.event.event_date} às ${result.data.event.start_time}, vinculada ao cliente.`;
-  if (tool === 'delete_project') return `Operação ${result.data?.name || ''} excluída com sucesso.`;
+  if (tool === 'delete_project') return `Projeto ${result.data?.name || ''} excluído com sucesso.`;
   if (tool === 'delete_client') return `Cliente ${result.data?.name || ''} excluído com sucesso.`;
   if (tool === 'delete_task') return `Tarefa ${result.data?.title || ''} excluída com sucesso.`;
   if (tool === 'delete_financial_transaction') return 'Lançamento financeiro excluído com sucesso.';
@@ -575,7 +582,7 @@ function describe(tool: ToolName, result: any) {
     if (tool === 'get_client' && result.data?.found === false) return result.data.guidance;
     if (tool === 'get_dashboard_summary') {
       const value = result.data;
-      return `Resumo atualizado da empresa:\n• Clientes ativos: ${value.activeClients}\n• Operações em andamento: ${value.activeProjects}\n• Tarefas pendentes: ${value.pendingTasks} (${value.overdueTasks} atrasadas)\n• Compromissos hoje: ${value.todayAppointments}\n• Receitas pagas no mês: R$ ${Number(value.monthRevenue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n• Despesas pagas no mês: R$ ${Number(value.monthExpenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${value.financialTotalsTruncated ? '\nObservação: o cálculo considera até 10.000 registros.' : ''}`;
+      return `Resumo atualizado da empresa:\n• Clientes ativos: ${value.activeClients}\n• Projetos em andamento: ${value.activeProjects}\n• Tarefas pendentes: ${value.pendingTasks} (${value.overdueTasks} atrasadas)\n• Compromissos hoje: ${value.todayAppointments}\n• Receitas pagas no mês: R$ ${Number(value.monthRevenue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n• Despesas pagas no mês: R$ ${Number(value.monthExpenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${value.financialTotalsTruncated ? '\nObservação: o cálculo considera até 10.000 registros.' : ''}`;
     }
     if (tool === 'get_my_day') {
       const value = result.data;
@@ -590,9 +597,9 @@ function describe(tool: ToolName, result: any) {
       return `Encontrei ${count} lançamento(s), totalizando R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${result.data?.truncated ? ' (a soma considera até 10.000 registros)' : ''}.${rows.length ? `\n${rows.slice(0, 30).map((row: any) => `• ${row.type === 'receita' ? 'Receita' : 'Despesa'}: ${row.description} — R$ ${Number(row.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${row.status}, vencimento ${row.due_date})`).join('\n')}` : ''}`;
     }
     const lines = list.map((row: any) => {
-      if (tool === 'get_clients') return `• ${row.name}${row.company_name ? ` — ${row.company_name}` : ''} (${row.status})${row.email ? ` • ${row.email}` : ''}`;
+      if (tool === 'get_clients') return `• ${row.name}${row.company_name ? ` — ${row.company_name}` : ''} (${clientStatusText(row.status)})${row.email ? ` • ${row.email}` : ''}`;
       if (tool === 'get_clients_needing_attention') return `• ${row.client.name}${row.client.company_name ? ` — ${row.client.company_name}` : ''} [${row.badgeText}]: ${row.reason}`;
-      if (tool === 'get_client') return `• ${row.name}${row.company_name ? ` — ${row.company_name}` : ''} (${row.status})${row.email ? ` • ${row.email}` : ''}`;
+      if (tool === 'get_client') return `• ${row.name}${row.company_name ? ` — ${row.company_name}` : ''} (${clientStatusText(row.status)})${row.email ? ` • ${row.email}` : ''}`;
       if (tool === 'get_documents') return `• ${row.title} — ${row.category}${row.file_size ? ` • ${row.file_size}` : ''} (${row.status})`;
       if (tool === 'get_projects') return `• ${row.name} — ${row.status}, ${row.progress || 0}%${row.due_date ? ` • prazo ${row.due_date}` : ''}`;
       if (tool === 'get_tasks') return `• ${row.title} — ${row.status}, prioridade ${row.priority}${row.due_date ? ` • prazo ${row.due_date}` : ''}`;
@@ -604,8 +611,8 @@ function describe(tool: ToolName, result: any) {
   const item = result.data;
   if (tool === 'create_client') return `Cliente ${item?.name || ''} cadastrado com sucesso.`;
   if (tool === 'update_client') return `Dados do cliente ${item?.name || ''} atualizados com sucesso.`;
-  if (tool === 'create_project') return `Operação ${item?.name || ''} cadastrada com sucesso.`;
-  if (tool === 'update_project') return `Operação ${item?.name || ''} atualizada com sucesso.`;
+  if (tool === 'create_project') return `Projeto ${item?.name || ''} cadastrado com sucesso.`;
+  if (tool === 'update_project') return `Projeto ${item?.name || ''} atualizado com sucesso.`;
   if (tool === 'create_task') return `Tarefa ${item?.title || ''} criada com sucesso.`;
   if (tool === 'update_task') return `Tarefa ${item?.title || ''} atualizada com sucesso.`;
   if (tool === 'complete_task') return `Tarefa ${item?.title || ''} concluída com sucesso.`;
@@ -743,10 +750,10 @@ Deno.serve(async (req: Request) => {
       try {
         const result = await executeTool(db, profile.company_id, user.id, confirmedTool, confirmedArgs);
         const update = await db.from('ai_action_logs').update({ status: 'success', result: result.data, error_message: null }).eq('id', confirmation.logId).eq('company_id', profile.company_id);
-        if (update.error) console.error('[gemini-edge] Ação gravada, mas o log de auditoria não foi atualizado:', update.error.message);
+        if (update.error) console.error('[gemini-edge] Falha ao atualizar auditoria da ação confirmada.', { requestId });
         return json({ success: true, status: 'success', text: describe(confirmedTool, result) }, 200, origin);
       } catch (error) {
-        await db.from('ai_action_logs').update({ status: 'failed', error_message: error instanceof Error ? error.message.slice(0, 500) : 'Falha ao executar ação.' }).eq('id', confirmation.logId).eq('company_id', profile.company_id);
+        await db.from('ai_action_logs').update({ status: 'failed', error_message: 'Falha ao executar ação.' }).eq('id', confirmation.logId).eq('company_id', profile.company_id);
         throw error;
       }
     }
@@ -763,7 +770,16 @@ Deno.serve(async (req: Request) => {
     const companyResult = await db.from('companies').select('name').eq('id', profile.company_id).single();
     if (companyResult.error) throw companyResult.error;
     const safeHistory = Array.isArray(body.history) ? body.history.slice(-12).filter((m: any) => ['user','assistant'].includes(m?.sender) && typeof m.content === 'string').map((m: any) => ({ role: m.sender === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content).slice(0, 4000) }] })) : [];
-    const contents = [...safeHistory.filter((m: any) => m.role === 'user' || m.role === 'model'), { role: 'user', parts: [{ text: body.message.trim() }] }];
+    const pageContextLabels: Record<string, string> = {
+      dashboard: 'painel inicial', clients: 'clientes', projects: 'projetos', tasks: 'tarefas',
+      calendar: 'agenda', finance: 'financeiro', documents: 'documentos',
+      'ai-assistant': 'assistente', reports: 'relatórios', architecture: 'arquitetura', settings: 'configurações',
+    };
+    const pageLabel = typeof body.pageContext === 'string' ? pageContextLabels[body.pageContext] : undefined;
+    const currentMessage = pageLabel
+      ? `Contexto da tela atual: ${pageLabel}. Use esse contexto para priorizar a resposta e consulte ou altere apenas dados autorizados para este usuário.\n\n${body.message.trim()}`
+      : body.message.trim();
+    const contents = [...safeHistory.filter((m: any) => m.role === 'user' || m.role === 'model'), { role: 'user', parts: [{ text: currentMessage }] }];
     const system = buildSystemInstruction(companyResult.data.name, saoPauloDate(timeZone), timeZone);
     const geminiStart = performance.now();
     let response: any;
@@ -819,11 +835,11 @@ Deno.serve(async (req: Request) => {
             result=await executeTool(db,profile.company_id,user.id,tool,args,timeZone);
           }
           const update=await db.from('ai_action_logs').update({status:'success',result:result.data,error_message:null}).eq('id',logId).eq('company_id',profile.company_id);
-          if(update.error) console.error('[gemini-edge] Ação gravada, mas o log não foi finalizado:',update.error.message);
+          if(update.error) console.error('[gemini-edge] Falha ao finalizar auditoria da ação.',{requestId});
           timings.databaseMs=Math.round(performance.now()-databaseStart);
           return respond({success:true,status:'success',text:describe(tool,result)},200);
         } catch (error) {
-          await db.from('ai_action_logs').update({status:'failed',error_message:error instanceof Error?error.message.slice(0,500):'Falha ao executar ação.'}).eq('id',logId).eq('company_id',profile.company_id);
+          await db.from('ai_action_logs').update({status:'failed',error_message:'Falha ao executar ação.'}).eq('id',logId).eq('company_id',profile.company_id);
           throw error;
         }
       }
@@ -848,8 +864,7 @@ Deno.serve(async (req: Request) => {
     const transportFailure = error instanceof TypeError && !('status' in error);
     const status = Number(error?.status) || (timedOut ? 504 : transportFailure ? 502 : 400);
     const errorType = error?.errorType || (timedOut ? 'TIMEOUT' : transportFailure ? 'UPSTREAM_UNAVAILABLE' : status === 429 ? 'RATE_LIMIT' : 'API_ERROR');
-    const internalMessage = String(error?.message || 'Falha ao processar a solicitação.').replace(/(?:AIza|AQ\.)[A-Za-z0-9_.-]{30,}/g, '[REDACTED]');
-    console.error('[gemini-edge]', errorType, internalMessage);
+    console.error('[gemini-edge] Falha ao processar solicitação.', JSON.stringify({requestId,errorType,status}));
     const publicMessage = status === 429
       ? 'Há muitas solicitações neste momento. Aguarde um pouco e tente novamente.'
       : 'Não foi possível concluir a operação. Tente novamente.';
@@ -865,7 +880,7 @@ function confirmationMessage(tool: ToolName, args: Record<string, any>) {
     : tool === 'delete_document'
       ? `exclusão do documento “${clean(args.query, 255)}” e tentativa de remover o arquivo armazenado`
     : tool === 'delete_project'
-      ? `exclusão da operação “${clean(args.query, 255)}”`
+      ? `exclusão do projeto “${clean(args.query, 255)}”`
     : ['delete_client','delete_task'].includes(tool)
       ? `exclusão do registro “${clean(args.query, 255)}”`
     : tool === 'create_financial_transaction'
@@ -877,9 +892,9 @@ function confirmationMessage(tool: ToolName, args: Record<string, any>) {
         : tool === 'update_task'
           ? `atualização da tarefa “${clean(args.query, 255)}”${args.title ? `: título ${clean(args.title, 255)}` : ''}${args.status ? `, status ${clean(args.status, 30)}` : ''}${args.priority ? `, prioridade ${clean(args.priority, 30)}` : ''}${args.due_date ? `, prazo ${clean(args.due_date, 10)}` : ''}`
         : tool === 'create_project'
-          ? `operação “${clean(args.name, 255)}”`
+          ? `projeto “${clean(args.name, 255)}”`
           : tool === 'update_project'
-            ? `atualização da operação “${clean(args.query, 255)}”${args.status ? `, status ${clean(args.status, 30)}` : ''}${args.progress !== undefined ? `, progresso ${Number(args.progress)}%` : ''}${args.due_date ? `, prazo ${clean(args.due_date, 10)}` : ''}`
+            ? `atualização do projeto “${clean(args.query, 255)}”${args.status ? `, status ${clean(args.status, 30)}` : ''}${args.progress !== undefined ? `, progresso ${Number(args.progress)}%` : ''}${args.due_date ? `, prazo ${clean(args.due_date, 10)}` : ''}`
     : tool === 'complete_task'
       ? `conclusão da tarefa “${clean(args.task_id_or_title, 255)}”`
       : tool === 'reschedule_calendar_event'

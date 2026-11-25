@@ -90,7 +90,10 @@ const AppContent: React.FC = () => {
     const nextPage = pagePaths[page] ? page : 'dashboard';
     const nextPrompt = prompt || aiInitialPrompt;
     const nextUrl = pagePaths[nextPage];
-    const nextState = { page: nextPage, navParams: params, aiInitialPrompt: nextPrompt };
+    const nextParams = nextPage === 'ai-assistant'
+      ? { ...(params || {}), sourcePage: currentPage }
+      : params;
+    const nextState = { page: nextPage, navParams: nextParams, aiInitialPrompt: nextPrompt };
     if (window.location.pathname !== nextUrl) {
       window.history.pushState(nextState, '', nextUrl);
     } else {
@@ -100,8 +103,8 @@ const AppContent: React.FC = () => {
     if (prompt) {
       setAiInitialPrompt(prompt);
     }
-    if (params) {
-      setNavParams(params);
+    if (nextParams) {
+      setNavParams(nextParams);
     } else {
       setNavParams(undefined);
     }
@@ -142,13 +145,13 @@ const AppContent: React.FC = () => {
   };
   const pageProps: Record<string, Record<string, unknown>> = {
     dashboard: { onNavigate: navigateTo },
-    clients: { initialClientId: navParams?.clientId, onNavigate: navigateTo },
-    projects: { initialProjectId: navParams?.projectId, onNavigate: navigateTo },
-    tasks: { initialFilter: navParams?.filter, onNavigate: navigateTo },
-    calendar: { onNavigate: navigateTo },
+    clients: { initialClientId: navParams?.clientId, initialFilter: navParams?.filter, onNavigate: navigateTo },
+    projects: { initialProjectId: navParams?.projectId, initialFilter: navParams?.filter, onNavigate: navigateTo },
+    tasks: { initialFilter: navParams?.filter, initialTaskId: navParams?.taskId, onNavigate: navigateTo },
+    calendar: { initialEventId: navParams?.eventId, onNavigate: navigateTo },
     finance: { initialType: navParams?.filter, onNavigate: navigateTo },
     documents: { onNavigate: navigateTo },
-    'ai-assistant': { initialPrompt: aiInitialPrompt, onNavigate: navigateTo },
+    'ai-assistant': { initialPrompt: aiInitialPrompt, initialContextPage: navParams?.sourcePage, onNavigate: navigateTo },
     reports: {}, architecture: {}, settings: {},
   };
   const page = pagePaths[currentPage] ? currentPage : 'dashboard';
@@ -159,7 +162,7 @@ const AppContent: React.FC = () => {
       componentProps={{
         currentPage: page,
         onNavigate: navigateTo,
-        children: <RetryableLazy key={page} load={pageLoaders[page]} componentProps={pageProps[page]} />,
+        children: <RetryableLazy key={`${page}:${JSON.stringify(navParams || {})}`} load={pageLoaders[page]} componentProps={pageProps[page]} />,
       }}
     />
   );

@@ -2,21 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
   Users,
   CheckSquare,
-  Calendar,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
   Sparkles,
   ArrowRight,
   Clock,
-  AlertTriangle,
   CheckCircle2,
-  CalendarDays,
   Plus,
-  Building2,
-  Workflow,
+  FolderKanban,
   FileText,
-  DollarSign,
   AlertCircle,
   ChevronRight,
 } from 'lucide-react';
@@ -29,6 +21,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { FinancialTransaction, MyDayItem } from '../types';
 import { isSupabaseConfigured } from '../services/supabase';
 import { getLocalDateISO } from '../utils/dates';
+import { useQuickCreate } from '../components/layout/QuickCreateContext';
 
 interface DashboardProps {
   onNavigate: (page: string, initialPrompt?: string, params?: Record<string, any>) => void;
@@ -103,6 +96,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const { user } = useAuth();
   const { showToast } = useNotification();
+  const openQuickCreate = useQuickCreate();
   const [, setTick] = useState(0);
 
   // Subscribe to reactive dataStore changes
@@ -149,7 +143,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handleMyDayItemClick = (item: MyDayItem) => {
     if (item.actionType === 'navigate_task') {
-      onNavigate('tasks');
+      onNavigate('tasks', undefined, { filter: item.type === 'overdue_task' ? 'overdue' : 'pending' });
     } else if (item.actionType === 'navigate_calendar') {
       onNavigate('calendar');
     } else if (item.actionType === 'navigate_finance') {
@@ -188,7 +182,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}.
           </p>
         </div>
-
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => openQuickCreate('project')}
+          leftIcon={<Plus className="w-4 h-4" />}
+          className="shrink-0 self-start sm:self-auto"
+        >
+          Novo projeto
+        </Button>
       </div>
 
       {/* Indicadores empresariais conectados aos registros da empresa */}
@@ -200,7 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           trend="neutral"
           icon={<Users className="w-5 h-5" />}
           iconBg="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-          onClick={() => onNavigate('clients')}
+          onClick={() => onNavigate('clients', undefined, { filter: 'ativo' })}
         />
         <MetricCard
           title="Tarefas Pendentes"
@@ -209,16 +211,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           trend={overdueTasks.length > 0 ? 'down' : 'neutral'}
           icon={<CheckSquare className="w-5 h-5" />}
           iconBg="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-          onClick={() => onNavigate('tasks')}
+          onClick={() => onNavigate('tasks', undefined, { filter: 'pending' })}
         />
         <MetricCard
-          title="Operações em andamento"
+          title="Projetos em andamento"
           value={activeProjects}
-          subtitle={`${projects.length} operação(ões) no total`}
+          subtitle={`${projects.length} projeto(s) no total`}
           trend="neutral"
-          icon={<Workflow className="w-5 h-5" />}
+          icon={<FolderKanban className="w-5 h-5" />}
           iconBg="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
-          onClick={() => onNavigate('projects')}
+          onClick={() => onNavigate('projects', undefined, { filter: 'em_andamento' })}
         />
         <MetricCard
           title="Conclusão de Tarefas"
@@ -227,43 +229,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           trend={taskCompletionRate >= 70 ? 'up' : 'neutral'}
           icon={<CheckCircle2 className="w-5 h-5" />}
           iconBg="bg-violet-500/10 text-violet-600 dark:text-violet-400"
-          onClick={() => onNavigate('reports')}
-        />
-        <MetricCard
-          title="Compromissos Hoje"
-          value={metrics.todayAppointments}
-          subtitle="Ver agenda do dia"
-          trend="neutral"
-          icon={<Calendar className="w-5 h-5" />}
-          iconBg="bg-purple-500/10 text-purple-600 dark:text-purple-400"
-          onClick={() => onNavigate('calendar')}
-        />
-        <MetricCard
-          title="Recebido no Mês"
-          value={formatBRL(metrics.monthRevenue)}
-          subtitle="Movimentações pagas"
-          trend="neutral"
-          icon={<TrendingUp className="w-5 h-5" />}
-          iconBg="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-          onClick={() => onNavigate('finance', undefined, { filter: 'receita' })}
-        />
-        <MetricCard
-          title="Pago no Mês"
-          value={formatBRL(metrics.monthExpenses)}
-          subtitle="Despesas registradas como pagas"
-          trend="neutral"
-          icon={<TrendingDown className="w-5 h-5" />}
-          iconBg="bg-rose-500/10 text-rose-600 dark:text-rose-400"
-          onClick={() => onNavigate('finance', undefined, { filter: 'despesa' })}
-        />
-        <MetricCard
-          title="Saldo Acumulado"
-          value={formatBRL(metrics.currentBalance)}
-          subtitle="Receitas e despesas pagas registradas"
-          trend="neutral"
-          icon={<Wallet className="w-5 h-5" />}
-          iconBg="bg-brand-500/10 text-brand-600 dark:text-brand-400"
-          onClick={() => onNavigate('finance')}
+          onClick={() => onNavigate('tasks', undefined, { filter: 'completed' })}
         />
       </div>
 
@@ -478,15 +444,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>}
 
-      {/* LINHA 2: OPERAÇÕES EM ANDAMENTO & FLUXO FINANCEIRO */}
+      {/* LINHA 2: PROJETOS EM ANDAMENTO & FLUXO FINANCEIRO */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Operações em andamento (1 Coluna) */}
+        {/* Projetos em andamento (1 Coluna) */}
         <Card className="space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Workflow className="w-4 h-4 text-brand-500" />
-                <span>Operações em andamento</span>
+                <FolderKanban className="w-4 h-4 text-brand-500" />
+                <span>Projetos em andamento</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Acompanhe o progresso das entregas
@@ -503,8 +469,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-3">
             {projects.length === 0 ? (
               <div className="py-6 text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Nenhuma operação cadastrada.</p>
-                <Button className="mt-3" size="sm" variant="outline" onClick={() => onNavigate('projects')}>Criar primeira operação</Button>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum projeto cadastrado.</p>
+                <Button className="mt-3" size="sm" variant="outline" onClick={() => onNavigate('projects')}>Criar primeiro projeto</Button>
               </div>
             ) : projects.slice(0, 3).map((proj) => (
               <div
@@ -651,7 +617,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span>Atividades Recentes</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Histórico em tempo real de operações no sistema
+                Histórico em tempo real das atividades do sistema
               </p>
             </div>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-500 font-mono">

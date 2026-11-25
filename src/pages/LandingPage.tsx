@@ -81,7 +81,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
         </h1>
 
         <p className="text-base sm:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed">
-          Centralize clientes, operações, pessoas, agenda e financeiro em um único lugar. Automatize rotinas e tome decisões com base nos dados da sua empresa.
+          Centralize clientes, projetos, pessoas, agenda e financeiro em um único lugar. Automatize rotinas e tome decisões com base nos dados da sua empresa.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
@@ -110,7 +110,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-600">
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Dashboard</span>
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Clientes e CRM</span>
-              <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Operações e tarefas</span>
+              <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Projetos e tarefas</span>
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Agenda</span>
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Financeiro</span>
               <span className="rounded-xl bg-slate-50 border border-slate-200 p-3">Relatórios</span>
@@ -182,7 +182,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
             </div>
             <h4 className="text-base font-bold text-slate-900">CRM & Gestão de Clientes</h4>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Cadastro de contatos e situação comercial, com operações, tarefas, agenda e movimentações financeiras vinculadas.
+              Cadastro de contatos e situação comercial, com projetos, tarefas, agenda e movimentações financeiras vinculadas.
             </p>
           </div>
 
@@ -215,7 +215,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onRegist
         <div className="grid gap-4 text-sm">
           <article className="rounded-2xl bg-white border border-slate-200 p-5">
             <h4 className="font-bold text-slate-900">O que posso gerenciar?</h4>
-            <p className="mt-2 text-slate-400">Clientes, operações, tarefas, agenda, lançamentos financeiros, documentos e relatórios em um só espaço.</p>
+            <p className="mt-2 text-slate-400">Clientes, projetos, tarefas, agenda, lançamentos financeiros, documentos e relatórios em um só espaço.</p>
           </article>
           <article className="rounded-2xl bg-white border border-slate-200 p-5">
             <h4 className="font-bold text-slate-900">O assistente de IA já está disponível?</h4>

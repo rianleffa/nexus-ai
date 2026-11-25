@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { QuickCreateModal, QuickCreateTab } from './QuickCreateModal';
@@ -24,6 +24,19 @@ export const Layout: React.FC<LayoutProps> = ({
   const handleOpenQuickCreate = useCallback((tab?: QuickCreateTab) => {
     if (tab) setQuickCreateDefaultTab(tab);
     setIsQuickCreateOpen(true);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => setIsSearchOpen(false), []);
+
+  useEffect(() => {
+    const handleSearchShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleSearchShortcut);
+    return () => window.removeEventListener('keydown', handleSearchShortcut);
   }, []);
 
   const quickCreateTabByPage: Partial<Record<string, QuickCreateTab>> = {
@@ -71,7 +84,7 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Command Search Modal (Ctrl+K) */}
       <CommandSearchModal
         isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
+        onClose={handleCloseSearch}
         onNavigate={onNavigate}
       />
     </div>

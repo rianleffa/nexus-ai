@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Users, CheckSquare, Calendar, DollarSign, ArrowRight, Workflow } from 'lucide-react';
+import { Search, X, Users, CheckSquare, Calendar, ArrowRight, FolderKanban } from 'lucide-react';
 import { dataStore } from '../../services/dataStore';
 
 interface CommandSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, prompt?: string, params?: Record<string, any>) => void;
 }
 
 export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
@@ -14,33 +14,40 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
   onNavigate,
 }) => {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 180);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if (e.key === 'Escape') {
         e.preventDefault();
-        // Toggle from parent or open
+        onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const q = query.toLowerCase().trim();
-  const clients = dataStore.getClients().filter(
-    (c) => c.name.toLowerCase().includes(q) || c.company_name.toLowerCase().includes(q)
-  );
-  const tasks = dataStore.getTasks().filter(
-    (t) => t.title.toLowerCase().includes(q)
-  );
-  const projects = dataStore.getProjects().filter(
-    (p) => p.name.toLowerCase().includes(q)
-  );
-  const events = dataStore.getCalendarEvents().filter(
-    (e) => e.title.toLowerCase().includes(q)
-  );
+  const q = query.trim() === debouncedQuery ? debouncedQuery.toLowerCase() : '';
+  const clients = q ? dataStore.getClients().filter(
+    (c) => c.name.toLowerCase().includes(q) || c.company_name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+  ) : [];
+  const tasks = q ? dataStore.getTasks().filter(
+    (t) => t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.client_name?.toLowerCase().includes(q)
+  ) : [];
+  const projects = q ? dataStore.getProjects().filter(
+    (p) => p.name.toLowerCase().includes(q) || p.client_name?.toLowerCase().includes(q)
+  ) : [];
+  const events = q ? dataStore.getCalendarEvents().filter(
+    (e) => e.title.toLowerCase().includes(q) || e.client_name?.toLowerCase().includes(q)
+  ) : [];
 
   const hasResults = clients.length > 0 || tasks.length > 0 || projects.length > 0 || events.length > 0;
 
@@ -55,7 +62,7 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
             <input
               type="text"
               autoFocus
-              placeholder="Buscar clientes, tarefas, operações ou compromissos..."
+              placeholder="Buscar clientes, tarefas, projetos ou compromissos..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full bg-transparent border-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none text-sm"
@@ -70,13 +77,17 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
 
           {/* Results Area */}
           <div className="max-h-96 overflow-y-auto p-3 space-y-4">
-            {!query && (
+            {!query.trim() && (
               <div className="py-8 text-center text-xs text-slate-400">
                 Digite um termo para pesquisar instantaneamente em toda a empresa.
               </div>
             )}
 
-            {query && !hasResults && (
+            {query.trim() && query.trim() !== debouncedQuery && (
+              <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400" role="status">Pesquisando...</div>
+            )}
+
+            {query.trim() && query.trim() === debouncedQuery && !hasResults && (
               <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
                 Nenhum resultado encontrado para "{query}".
               </div>
@@ -93,7 +104,7 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
                     <div
                       key={c.id}
                       onClick={() => {
-                        onNavigate('clients');
+                        onNavigate('clients', undefined, { clientId: c.id });
                         onClose();
                       }}
                       className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer text-xs group transition-colors"
@@ -122,7 +133,7 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
                     <div
                       key={t.id}
                       onClick={() => {
-                        onNavigate('tasks');
+                        onNavigate('tasks', undefined, { taskId: t.id });
                         onClose();
                       }}
                       className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer text-xs group transition-colors"
@@ -144,14 +155,14 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
             {projects.length > 0 && (
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-2 mb-1.5 flex items-center gap-1.5">
-                  <Workflow className="w-3.5 h-3.5" /> Operações ({projects.length})
+                  <FolderKanban className="w-3.5 h-3.5" /> Projetos ({projects.length})
                 </div>
                 <div className="space-y-1">
                   {projects.slice(0, 3).map((p) => (
                     <div
                       key={p.id}
                       onClick={() => {
-                        onNavigate('projects');
+                        onNavigate('projects', undefined, { projectId: p.id });
                         onClose();
                       }}
                       className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer text-xs group transition-colors"
@@ -180,7 +191,7 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
                     <div
                       key={e.id}
                       onClick={() => {
-                        onNavigate('calendar');
+                        onNavigate('calendar', undefined, { eventId: e.id });
                         onClose();
                       }}
                       className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer text-xs group transition-colors"

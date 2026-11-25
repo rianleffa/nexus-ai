@@ -286,7 +286,7 @@ export const Documents: React.FC<DocumentsProps> = ({ onNavigate }) => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <FileText className="w-6 h-6 text-brand-500" />
+            {company?.logo_url ? <img src={company.logo_url} alt={`Logotipo de ${company.name}`} className="h-8 w-8 rounded-lg border border-slate-200 bg-white object-contain p-0.5 dark:border-slate-800" /> : <FileText className="w-6 h-6 text-brand-500" />}
             <span>Documentos da Empresa</span>
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">

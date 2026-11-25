@@ -23,11 +23,13 @@ import { dataStore } from '../services/dataStore';
 
 interface AIAssistantProps {
   initialPrompt?: string;
+  initialContextPage?: string;
   onNavigate: (page: string) => void;
 }
 
 export const AIAssistant: React.FC<AIAssistantProps> = ({
   initialPrompt,
+  initialContextPage,
   onNavigate,
 }) => {
   const { user, company } = useAuth();
@@ -111,7 +113,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
     setIsLoading(true);
 
     try {
-      const response = await AIService.processMessage(textToSend, [...messages, userMsg]);
+      const response = await AIService.processMessage(textToSend, [...messages, userMsg], initialContextPage);
       setMessages((prev) => [...prev, response]);
 
       if (response.feedback === 'success') {
@@ -269,14 +271,6 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onNavigate('architecture')}
-            className="text-xs"
-          >
-            Ver Fluxo de Segurança
-          </Button>
           <Button
             variant="ghost"
             size="sm"

@@ -441,13 +441,23 @@ class DataStore {
         continue;
       }
 
-      // 3. Prospects
-      if (client.status === 'prospect') {
+      // 3. Clientes em negociação
+      if (client.status === 'em_negociacao') {
         results.push({
           client,
-          reason: 'Prospect aguardando proposta ou alinhamento comercial',
+          reason: 'Em negociação aguardando proposta ou alinhamento comercial',
           urgency: 'media',
-          badgeText: 'Prospect',
+          badgeText: 'Em negociação',
+        });
+        continue;
+      }
+
+      if (client.status === 'pendente') {
+        results.push({
+          client,
+          reason: 'Cadastro pendente de atualização ou validação',
+          urgency: 'media',
+          badgeText: 'Pendente',
         });
         continue;
       }
@@ -681,7 +691,7 @@ class DataStore {
       created_at: new Date().toISOString(),
     };
     this.projects.unshift(newProj);
-    this.addActivity(`Operação "${newProj.name}" foi criada.`, 'task');
+    this.addActivity(`Projeto "${newProj.name}" foi criada.`, 'task');
     this.persist();
     supabaseSync.syncProject('upsert', newProj);
     return newProj;

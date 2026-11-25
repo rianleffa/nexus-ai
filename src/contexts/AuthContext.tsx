@@ -22,12 +22,26 @@ interface AuthContextType {
   changePassword: (newPassword: string) => Promise<{ success: boolean; message: string }>;
   uploadAvatar: (file: File) => Promise<string>;
   removeAvatar: () => Promise<boolean>;
+  uploadCompanyLogo: (file: File) => Promise<string>;
+  removeCompanyLogo: () => Promise<boolean>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const getPublicStoragePath = (url: string | undefined, bucket: string) => {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  const markerIndex = url.indexOf(marker);
+  if (markerIndex < 0) return null;
+  try {
+    return decodeURIComponent(url.slice(markerIndex + marker.length).split('?')[0]);
+  } catch {
+    return null;
+  }
+};
 
 // Keep auth callbacks pinned to this app's canonical production domain. A shared
 // Supabase project can have a Site URL owned by another app, so relying on that
@@ -117,6 +131,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       website: companyRow.website || undefined,
       city: companyRow.city || undefined,
       state: companyRow.state || undefined,
+      postal_code: companyRow.postal_code || undefined,
+      logo_url: companyRow.logo_url || undefined,
       plan: companyRow.plan || 'starter',
       created_at: companyRow.created_at || new Date().toISOString(),
       updated_at: companyRow.updated_at || undefined,
@@ -495,10 +511,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .getPublicUrl(filePath);
 
         const avatarUrl = publicUrlData.publicUrl;
-        await updateProfile({ avatar_url: avatarUrl });
+        const saved = await updateProfile({ avatar_url: avatarUrl });
+        if (!saved) throw new Error('Não foi possível salvar a foto no perfil.');
         return avatarUrl;
       } catch (e: any) {
-        console.warn('Falha no upload para o Supabase Storage, utilizando fallback local:', e);
+        throw new Error(e?.message || 'Não foi possível enviar a foto ao Supabase Storage.');
       }
     }
 
@@ -517,7 +534,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const removeAvatar = async (): Promise<boolean> => {
     if (!user) return false;
+    if (isSupabaseConfigured && supabase) {
+      const path = getPublicStoragePath(user.avatar_url, 'avatars');
+      if (path && path.startsWith(`${user.id}/`)) {
+        const { error } = await supabase.storage.from('avatars').remove([path]);
+        if (error) return false;
+      }
+    }
     return await updateProfile({ avatar_url: '' });
+  };
+
+  const uploadCompanyLogo = async (file: File): Promise<string> => {
+    if (!company?.id) throw new Error('Empresa não identificada.');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      throw new Error('Formato inválido. Envie uma imagem JPG, PNG ou WEBP.');
+    }
+    if (file.size > 5 * 1024 * 1024) throw new Error('O logotipo deve ter no máximo 5 MB.');
+
+    if (isSupabaseConfigured && supabase) {
+      const previousPath = getPublicStoragePath(company.logo_url, 'company-logos');
+      const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+      const filePath = `${company.id}/${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from('company-logos')
+        .upload(filePath, file, { upsert: true, contentType: file.type, cacheControl: '3600' });
+      if (uploadError) throw new Error(uploadError.message || 'Não foi possível enviar o logotipo.');
+      const { data } = supabase.storage.from('company-logos').getPublicUrl(filePath);
+      const logoUrl = `${data.publicUrl}?v=${Date.now()}`;
+      const saved = await updateCompany({ logo_url: logoUrl });
+      if (!saved) {
+        await supabase.storage.from('company-logos').remove([filePath]);
+        throw new Error('O logotipo foi enviado, mas não foi possível atualizar os dados da empresa.');
+      }
+      if (previousPath?.startsWith(`${company.id}/`) && previousPath !== filePath) {
+        await supabase.storage.from('company-logos').remove([previousPath]);
+      }
+      return logoUrl;
+    }
+
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const logoUrl = reader.result as string;
+        const saved = await updateCompany({ logo_url: logoUrl });
+        if (saved) resolve(logoUrl);
+        else reject(new Error('Não foi possível salvar o logotipo.'));
+      };
+      reader.onerror = () => reject(new Error('Falha ao processar o arquivo de imagem.'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeCompanyLogo = async (): Promise<boolean> => {
+    if (!company?.id) return false;
+    if (isSupabaseConfigured && supabase) {
+      const path = getPublicStoragePath(company.logo_url, 'company-logos');
+      if (path && path.startsWith(`${company.id}/`)) {
+        const { error } = await supabase.storage.from('company-logos').remove([path]);
+        if (error) return false;
+      }
+    }
+    return await updateCompany({ logo_url: '' });
   };
 
   const logout = async () => {
@@ -559,6 +636,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         changePassword,
         uploadAvatar,
         removeAvatar,
+        uploadCompanyLogo,
+        removeCompanyLogo,
         logout,
       }}
     >

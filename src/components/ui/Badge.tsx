@@ -53,8 +53,10 @@ export const ClientStatusBadge: React.FC<{ status: ClientStatus }> = ({ status }
       return <Badge variant="success" dot>Ativo</Badge>;
     case 'inativo':
       return <Badge variant="default" dot>Inativo</Badge>;
-    case 'prospect':
-      return <Badge variant="info" dot>Prospect</Badge>;
+    case 'em_negociacao':
+      return <Badge variant="info" dot>Em negociação</Badge>;
+    case 'pendente':
+      return <Badge variant="warning" dot>Pendente</Badge>;
   }
 };
 

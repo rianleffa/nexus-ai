@@ -1,18 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Settings as SettingsIcon,
   Building,
   User as UserIcon,
-  Key,
-  Database,
   RotateCcw,
-  CheckCircle2,
   Lock,
   Camera,
   Trash2,
-  Sparkles,
-  Shield,
   Upload,
+  MapPin,
+  Sun,
+  Moon,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -21,14 +20,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { dataStore } from '../services/dataStore';
 import { useNotification } from '../contexts/NotificationContext';
 import { UserAvatar } from '../components/common/UserAvatar';
-import { supabaseSync } from '../services/supabaseSync';
 import { isSupabaseConfigured } from '../services/supabase';
+import { useTheme } from '../contexts/ThemeContext';
 
 export const Settings: React.FC = () => {
-  const { user, company, updateProfile, updateCompany, changePassword, uploadAvatar, removeAvatar } = useAuth();
+  const { user, company, updateProfile, updateCompany, changePassword, uploadAvatar, removeAvatar, uploadCompanyLogo, removeCompanyLogo } = useAuth();
   const { showToast } = useNotification();
+  const { theme, setTheme } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'integrations' | 'demo'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'security' | 'preferences' | 'demo'>('profile');
 
   // User Profile Form states
   const [fullName, setFullName] = useState(user?.full_name || user?.name || '');
@@ -38,9 +38,9 @@ export const Settings: React.FC = () => {
   const [jobTitle, setJobTitle] = useState(user?.job_title || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   // Password Form states
-  const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
@@ -53,44 +53,79 @@ export const Settings: React.FC = () => {
   const [companyPhone, setCompanyPhone] = useState(company?.phone || '');
   const [companyAddress, setCompanyAddress] = useState(company?.address || '');
   const [companyWebsite, setCompanyWebsite] = useState(company?.website || '');
+  const [postalCode, setPostalCode] = useState(company?.postal_code || '');
+  const [companyCity, setCompanyCity] = useState(company?.city || '');
+  const [companyState, setCompanyState] = useState(company?.state || '');
+  const [isLookingUpPostalCode, setIsLookingUpPostalCode] = useState(false);
 
-  // Integrations states
-  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
-  const [supabaseTestResult, setSupabaseTestResult] = useState<{
-    success: boolean;
-    message: string;
-    tablesFound?: string[];
-    latencyMs?: number;
-  } | null>(null);
+  useEffect(() => {
+    if (user) {
+      setFullName(user.full_name || user.name || '');
+      setDisplayName(user.display_name || user.name || '');
+      setEmail(user.email || '');
+      setPhone(user.phone || '');
+      setJobTitle(user.job_title || '');
+      setBio(user.bio || '');
+    }
+    if (company) {
+      setCompanyName(company.name || '');
+      setCnpj(company.cnpj || '');
+      setSegment(company.segment || '');
+      setCompanyEmail(company.email || '');
+      setCompanyPhone(company.phone || '');
+      setCompanyAddress(company.address || '');
+      setCompanyWebsite(company.website || '');
+      setPostalCode(company.postal_code || '');
+      setCompanyCity(company.city || '');
+      setCompanyState(company.state || '');
+    }
+  }, [user?.id, company?.id]);
 
-  const handleTestConnection = async () => {
-    setIsTestingSupabase(true);
-    setSupabaseTestResult(null);
-    const result = await supabaseSync.testConnection();
-    setSupabaseTestResult(result);
-    setIsTestingSupabase(false);
-    if (result.success) {
-      showToast(result.message, 'success');
-    } else {
-      showToast(result.message, 'warning');
+  const handlePostalCodeLookup = async () => {
+    const digits = postalCode.replace(/\D/g, '');
+    if (digits.length !== 8) {
+      showToast('Informe um CEP válido com 8 números.', 'warning');
+      return;
+    }
+    setIsLookingUpPostalCode(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      if (!response.ok) throw new Error('Não foi possível consultar o CEP.');
+      const data = await response.json();
+      if (data.erro) throw new Error('CEP não encontrado. Confira os números e tente novamente.');
+      const addressParts = [data.logradouro, data.bairro].filter(Boolean);
+      if (addressParts.length) setCompanyAddress(addressParts.join(', '));
+      setCompanyCity(data.localidade || '');
+      setCompanyState(data.uf || '');
+      setPostalCode(`${digits.slice(0, 5)}-${digits.slice(5)}`);
+      showToast('Endereço preenchido pelo CEP. Confira os dados antes de salvar.', 'success');
+    } catch (error: any) {
+      showToast(error?.message || 'Não foi possível buscar esse CEP.', 'error');
+    } finally {
+      setIsLookingUpPostalCode(false);
     }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fullName.trim()) {
+      showToast('Informe seu nome completo.', 'warning');
+      return;
+    }
     const saved = await updateProfile({
-      full_name: fullName,
-      name: fullName,
-      display_name: displayName,
-      phone,
-      job_title: jobTitle,
-      bio,
+      full_name: fullName.trim(),
+      name: fullName.trim(),
+      display_name: displayName.trim() || fullName.trim(),
+      phone: phone.trim(),
+      job_title: jobTitle.trim(),
+      bio: bio.trim(),
     });
     showToast(saved ? 'Perfil do usuário atualizado com sucesso!' : 'Não foi possível salvar o perfil no servidor.', saved ? 'success' : 'error');
   };
 
   const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     try {
@@ -105,8 +140,28 @@ export const Settings: React.FC = () => {
   };
 
   const handleRemoveAvatar = async () => {
-    await removeAvatar();
-    showToast('Foto de perfil removida.', 'info');
+    const removed = await removeAvatar();
+    showToast(removed ? 'Foto de perfil removida.' : 'Não foi possível remover a foto de perfil.', removed ? 'info' : 'error');
+  };
+
+  const handleCompanyLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setIsUploadingLogo(true);
+    try {
+      await uploadCompanyLogo(file);
+      showToast('Logotipo da empresa atualizado.', 'success');
+    } catch (error: any) {
+      showToast(error?.message || 'Não foi possível enviar o logotipo.', 'error');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveCompanyLogo = async () => {
+    const removed = await removeCompanyLogo();
+    showToast(removed ? 'Logotipo removido.' : 'Não foi possível remover o logotipo.', removed ? 'info' : 'error');
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -120,7 +175,6 @@ export const Settings: React.FC = () => {
     setIsChangingPass(false);
     if (res.success) {
       showToast(res.message, 'success');
-      setCurrentPass('');
       setNewPass('');
       setConfirmPass('');
     } else {
@@ -130,14 +184,21 @@ export const Settings: React.FC = () => {
 
   const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!companyName.trim()) {
+      showToast('Informe o nome da empresa.', 'warning');
+      return;
+    }
     const saved = await updateCompany({
-      name: companyName,
-      cnpj,
-      segment,
-      email: companyEmail,
-      phone: companyPhone,
-      address: companyAddress,
-      website: companyWebsite,
+      name: companyName.trim(),
+      cnpj: cnpj.trim(),
+      segment: segment.trim(),
+      email: companyEmail.trim(),
+      phone: companyPhone.trim(),
+      address: companyAddress.trim(),
+      website: companyWebsite.trim(),
+      postal_code: postalCode.trim(),
+      city: companyCity.trim(),
+      state: companyState.trim(),
     });
     showToast(saved ? 'Dados da empresa salvos com sucesso!' : 'Não foi possível salvar os dados da empresa.', saved ? 'success' : 'error');
   };
@@ -158,7 +219,7 @@ export const Settings: React.FC = () => {
           <span>Configurações & Perfil</span>
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Gerencie seu perfil de usuário, informações da sua organização, credenciais e integrações
+          Gerencie seu perfil pessoal, os dados da empresa, a segurança da conta e a aparência do sistema.
         </p>
       </div>
 
@@ -167,7 +228,8 @@ export const Settings: React.FC = () => {
         {[
           { id: 'profile', label: 'Meu Perfil', icon: UserIcon },
           { id: 'company', label: 'Minha Empresa', icon: Building },
-          { id: 'integrations', label: 'Integrações & IA', icon: Key },
+          { id: 'security', label: 'Segurança', icon: ShieldCheck },
+          { id: 'preferences', label: 'Preferências', icon: Sun },
           ...(!isSupabaseConfigured ? [{ id: 'demo', label: 'Dados de demonstração', icon: RotateCcw }] : []),
         ].map((tab) => {
           const Icon = tab.icon;
@@ -317,45 +379,6 @@ export const Settings: React.FC = () => {
             </form>
           </Card>
 
-          {/* Change Password Card */}
-          <Card className="p-6 space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-              <Lock className="w-4 h-4 text-brand-500" />
-              <span>Segurança da Conta & Alteração de Senha</span>
-            </h3>
-
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Nova Senha *"
-                  type="password"
-                  required
-                  value={newPass}
-                  onChange={(e) => setNewPass(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                />
-                <Input
-                  label="Confirmar Nova Senha *"
-                  type="password"
-                  required
-                  value={confirmPass}
-                  onChange={(e) => setConfirmPass(e.target.value)}
-                  placeholder="Repita a nova senha"
-                />
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="submit"
-                  isLoading={isChangingPass}
-                >
-                  Alterar Senha
-                </Button>
-              </div>
-            </form>
-          </Card>
         </div>
       )}
 
@@ -377,6 +400,34 @@ export const Settings: React.FC = () => {
           </div>
 
           <form onSubmit={handleSaveCompany} className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30 p-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                {company?.logo_url ? (
+                  <img src={company.logo_url} alt={`Logotipo de ${company.name}`} className="h-full w-full object-contain p-1" />
+                ) : (
+                  <Building className="h-7 w-7 text-slate-300 dark:text-slate-600" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Logotipo empresarial</h4>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">JPG, PNG ou WEBP, até 5 MB. Será exibido nos relatórios e na área de documentos.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="cursor-pointer">
+                  <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-brand-500 px-3 text-xs font-semibold text-slate-950 transition hover:bg-brand-400">
+                    <Upload className="h-3.5 w-3.5" />
+                    {isUploadingLogo ? 'Enviando...' : company?.logo_url ? 'Alterar logotipo' : 'Enviar logotipo'}
+                  </span>
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleCompanyLogoChange} disabled={isUploadingLogo} className="hidden" />
+                </label>
+                {company?.logo_url && (
+                  <Button variant="ghost" size="sm" type="button" onClick={handleRemoveCompanyLogo} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40">
+                    <Trash2 className="h-3.5 w-3.5" /> Remover
+                  </Button>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Razão Social / Nome Fantasia *"
@@ -421,12 +472,29 @@ export const Settings: React.FC = () => {
               />
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-end">
+              <Input
+                label="CEP"
+                value={postalCode}
+                onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2'))}
+                onBlur={handlePostalCodeLookup}
+                placeholder="00000-000"
+                inputMode="numeric"
+              />
+              <Button variant="outline" size="sm" type="button" onClick={handlePostalCodeLookup} isLoading={isLookingUpPostalCode} leftIcon={<MapPin className="h-3.5 w-3.5" />}>
+                Buscar CEP
+              </Button>
+            </div>
             <Input
-              label="Endereço Completo"
+              label="Endereço"
               value={companyAddress}
               onChange={(e) => setCompanyAddress(e.target.value)}
-              placeholder="Rua, Número, Bairro, Cidade/UF - CEP"
+              placeholder="Rua, número e bairro"
             />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input label="Cidade" value={companyCity} onChange={(event) => setCompanyCity(event.target.value)} />
+              <Input label="Estado (UF)" value={companyState} onChange={(event) => setCompanyState(event.target.value.toUpperCase().slice(0, 2))} maxLength={2} />
+            </div>
 
             <div className="flex justify-end pt-2">
               <Button variant="primary" size="sm" type="submit">
@@ -437,94 +505,69 @@ export const Settings: React.FC = () => {
         </Card>
       )}
 
-      {/* TAB 3: INTEGRAÇÕES & IA */}
-      {activeTab === 'integrations' && (
-        <Card className="p-6 space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2.5">
-              <Key className="w-5 h-5 text-brand-500" />
+      {activeTab === 'security' && (
+        <div className="space-y-6">
+          <Card className="p-6 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400"><ShieldCheck className="h-5 w-5" /></div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Integrações & Banco de Dados Supabase
-                </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Gerenciamento de credenciais do PostgreSQL, Storage e Google Gemini
-                </p>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Proteção da conta</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">A autenticação e as sessões são gerenciadas pelo provedor de login conectado.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 font-bold border border-slate-500/20">
-                Diagnóstico do Servidor
-              </span>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
+              <span className="text-slate-500 dark:text-slate-400">E-mail da conta</span>
+              <p className="mt-1 font-semibold text-slate-900 dark:text-white">{user?.email || 'Não disponível'}</p>
             </div>
-          </div>
+          </Card>
 
-          <div className="space-y-4 text-xs">
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 leading-relaxed text-slate-600 dark:text-slate-300">
-              As credenciais são definidas no ambiente de implantação. A chave Gemini deve ficar apenas nos secrets da função Supabase; esta tela não lê nem exibe chaves do servidor.
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+              <Lock className="h-4 w-4 text-brand-500" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Alterar senha</h3>
             </div>
-
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">Estado da conexão: {isSupabaseConfigured ? 'Supabase configurado' : 'Supabase não configurado'}. Use o teste abaixo para confirmar a conexão com o projeto.</p>
-
-            {/* Test Connection Button & Actions */}
-            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTestConnection}
-                  isLoading={isTestingSupabase}
-                  leftIcon={<Database className="w-4 h-4 text-brand-500" />}
-                >
-                  Testar Conexão Supabase
-                </Button>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Input label="Nova senha *" type="password" required minLength={6} autoComplete="new-password" value={newPass} onChange={(event) => setNewPass(event.target.value)} placeholder="Mínimo 6 caracteres" />
+                <Input label="Confirmar nova senha *" type="password" required minLength={6} autoComplete="new-password" value={confirmPass} onChange={(event) => setConfirmPass(event.target.value)} placeholder="Repita a nova senha" />
               </div>
-
-              <span className="text-[11px] text-slate-400">
-                Schema SQL completo disponível em <code className="font-mono text-slate-500">supabase/schema.sql</code>
-              </span>
-            </div>
-
-            {/* Diagnostic Output Card */}
-            {supabaseTestResult && (
-              <div
-                className={`p-4 rounded-xl border text-xs space-y-2 ${
-                  supabaseTestResult.success
-                    ? 'bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-amber-50/50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
-                }`}
-              >
-                <div className="flex items-center gap-2 font-bold">
-                  <CheckCircle2
-                    className={`w-4 h-4 ${
-                      supabaseTestResult.success ? 'text-emerald-500' : 'text-amber-500'
-                    }`}
-                  />
-                  <span>
-                    {supabaseTestResult.success
-                      ? 'Diagnóstico: Supabase Conectado'
-                      : 'Diagnóstico: Supabase não conectado'}
-                  </span>
-                </div>
-                <p className="text-[11px] opacity-90">{supabaseTestResult.message}</p>
-                {supabaseTestResult.tablesFound && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {supabaseTestResult.tablesFound.map((tbl) => (
-                      <span
-                        key={tbl}
-                        className="px-2 py-0.5 rounded-md bg-white/60 dark:bg-slate-900/60 font-mono text-[10px] border border-emerald-500/20"
-                      >
-                        ✓ {tbl}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="flex justify-end">
+                <Button variant="primary" size="sm" type="submit" isLoading={isChangingPass}>Atualizar senha</Button>
               </div>
-            )}
-          </div>
-        </Card>
+            </form>
+          </Card>
+        </div>
       )}
 
+      {activeTab === 'preferences' && (
+        <div className="space-y-6">
+          <Card className="p-6 space-y-5">
+            <div className="border-b border-slate-100 pb-3 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Aparência</h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Escolha o tema para este dispositivo. A preferência é salva automaticamente.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {([
+                { value: 'light', label: 'Tema claro', description: 'Fundo claro e alto contraste', icon: Sun },
+                { value: 'dark', label: 'Tema escuro', description: 'Confortável em ambientes pouco iluminados', icon: Moon },
+              ] as const).map((option) => {
+                const Icon = option.icon;
+                const selected = theme === option.value;
+                return (
+                  <button key={option.value} type="button" aria-pressed={selected} onClick={() => setTheme(option.value)} className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${selected ? 'border-brand-500 bg-brand-50/70 ring-2 ring-brand-500/20 dark:bg-brand-950/30' : 'border-slate-200 bg-white hover:border-brand-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-700'}`}>
+                    <Icon className="mt-0.5 h-5 w-5 text-brand-500" />
+                    <span><strong className="block text-sm text-slate-900 dark:text-white">{option.label}</strong><small className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{option.description}</small></span>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+          <Card className="p-6">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Formato regional</h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">O sistema utiliza Português (Brasil), moeda Real (R$) e datas no formato brasileiro.</p>
+          </Card>
+        </div>
+      )}
       {/* TAB 4: ZONA DEMO */}
       {!isSupabaseConfigured && activeTab === 'demo' && (
         <Card className="p-6 space-y-4 border-rose-200 dark:border-rose-900/50">

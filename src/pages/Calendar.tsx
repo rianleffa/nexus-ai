@@ -25,33 +25,37 @@ import { useAuth } from '../contexts/AuthContext';
 import { addDaysToLocalDateISO, getLocalDateISO } from '../utils/dates';
 
 interface CalendarProps {
+  initialEventId?: string;
   onNavigate?: (page: string, prompt?: string, params?: Record<string, any>) => void;
 }
 
-export const Calendar: React.FC<CalendarProps> = ({ onNavigate }) => {
+export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }) => {
+  const initialEvent = initialEventId
+    ? dataStore.getCalendarEvents().find((item) => item.id === initialEventId)
+    : undefined;
   const { user } = useAuth();
   const { showToast } = useNotification();
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>(() => dataStore.getCalendarEvents());
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'agenda'>('month');
 
   // Dynamic Month & Year Navigation
-  const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [selectedDay, setSelectedDay] = useState<string>(() => getLocalDateISO());
+  const [currentDate, setCurrentDate] = useState(() => initialEvent ? new Date(`${initialEvent.event_date}T12:00:00`) : new Date());
+  const [selectedDay, setSelectedDay] = useState<string>(() => initialEvent?.event_date || getLocalDateISO());
   
   // Modals
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(Boolean(initialEvent));
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(initialEvent || null);
 
   // Form states
-  const [title, setTitle] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [eventDate, setEventDate] = useState(addDaysToLocalDateISO(1));
-  const [startTime, setStartTime] = useState('14:00');
-  const [duration, setDuration] = useState(60);
-  const [eventType, setEventType] = useState<CalendarEventType>('reuniao');
-  const [location, setLocation] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState(initialEvent?.title || '');
+  const [clientName, setClientName] = useState(initialEvent?.client_name || '');
+  const [clientId, setClientId] = useState(initialEvent?.client_id || '');
+  const [eventDate, setEventDate] = useState(initialEvent?.event_date || addDaysToLocalDateISO(1));
+  const [startTime, setStartTime] = useState(initialEvent?.start_time || '14:00');
+  const [duration, setDuration] = useState(initialEvent?.duration_minutes || 60);
+  const [eventType, setEventType] = useState<CalendarEventType>(initialEvent?.event_type || 'reuniao');
+  const [location, setLocation] = useState(initialEvent?.location || '');
+  const [description, setDescription] = useState(initialEvent?.description || '');
 
   const clients = dataStore.getClients();
 
@@ -173,6 +177,7 @@ export const Calendar: React.FC<CalendarProps> = ({ onNavigate }) => {
     setEventType(evt.event_type);
     setLocation(evt.location || '');
     setDescription(evt.description || '');
+    setIsCreateModalOpen(true);
   };
 
   const handleCancelEvent = (id: string, eventTitle: string) => {

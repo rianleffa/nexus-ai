@@ -13,6 +13,8 @@ export interface Company {
   website?: string;
   city?: string;
   state?: string;
+  postal_code?: string;
+  logo_url?: string;
   plan: 'starter' | 'pro' | 'enterprise';
   created_at: string;
   updated_at?: string;
@@ -37,7 +39,7 @@ export interface User {
 
 export interface UserProfile extends User {}
 
-export type ClientStatus = 'ativo' | 'inativo' | 'prospect';
+export type ClientStatus = 'ativo' | 'em_negociacao' | 'pendente' | 'inativo';
 
 export interface Client {
   id: string;

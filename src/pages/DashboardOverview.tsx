@@ -12,7 +12,7 @@ import {
   Plus,
   UserRound,
   Wallet,
-  Workflow,
+  FolderKanban,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { dataStore } from '../services/dataStore';
@@ -148,7 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <section aria-label="Indicadores principais" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Saldo Financeiro" value={formatBRL(metrics.currentBalance)} detail="Acumulado · movimentações pagas" icon={<Wallet className="h-4 w-4" />} onClick={() => onNavigate('finance')} />
         <Metric label="Clientes Ativos" value={metrics.activeClients} detail="Ver carteira de clientes" icon={<UserRound className="h-4 w-4" />} onClick={() => onNavigate('clients')} />
-        <Metric label="Operações em Andamento" value={activeOperations} detail="Acompanhar operações" icon={<Workflow className="h-4 w-4" />} onClick={() => onNavigate('projects')} />
+        <Metric label="Projetos em andamento" value={activeOperations} detail="Acompanhar projetos" icon={<FolderKanban className="h-4 w-4" />} onClick={() => onNavigate('projects')} />
         <Metric label="Tarefas Pendentes" value={metrics.pendingTasks} detail="Ver todas as tarefas" icon={<CheckSquare className="h-4 w-4" />} onClick={() => onNavigate('tasks')} />
       </section>
 

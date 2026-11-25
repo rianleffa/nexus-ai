@@ -3,7 +3,7 @@ export function getInstantReply(contents) {
  const last = [...contents].reverse().find(c => c.role === 'user');
  const text = (last?.parts || []).map(p => p.text || '').join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
  if (/^(ola|oi|bom dia|boa tarde|boa noite)[!,.? ]*(voce esta funcionando|esta funcionando|quais funcionalidades voce possui|o que voce consegue fazer|como pode me ajudar)?[?.! ]*$/.test(text)) {
-  return 'Olá! Posso ajudar com clientes, operações, tarefas, agenda, financeiro, relatórios e documentos. Executo solicitações comuns diretamente e peço confirmação para ações sensíveis.';
+  return 'Olá! Posso ajudar com clientes, projetos, tarefas, agenda, financeiro, relatórios e documentos. Executo solicitações comuns diretamente e peço confirmação para ações sensíveis.';
  }
  return null;
 }

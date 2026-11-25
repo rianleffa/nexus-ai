@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS public.companies (
     website VARCHAR(255),
     city VARCHAR(100),
     state VARCHAR(50),
+    postal_code VARCHAR(9),
+    logo_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -83,7 +85,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
     phone VARCHAR(50),
     address TEXT,
     notes TEXT,
-    status VARCHAR(50) DEFAULT 'ativo' CHECK (status IN ('ativo', 'inativo', 'prospect')),
+    status VARCHAR(50) DEFAULT 'ativo' CHECK (status IN ('ativo', 'em_negociacao', 'pendente', 'inativo')),
     total_revenue NUMERIC(14, 2) DEFAULT 0.00,
     last_interaction TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -380,6 +382,9 @@ CREATE TRIGGER set_documents_updated_at BEFORE UPDATE ON public.documents FOR EA
 -- ==============================================================================
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', false) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('company-logos', 'company-logos', true, 5242880, ARRAY['image/jpeg', 'image/png', 'image/webp']::text[])
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public, file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 DROP POLICY IF EXISTS "Avatar Public View" ON storage.objects;
 CREATE POLICY "Avatar Public View" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
@@ -688,6 +693,19 @@ CREATE POLICY "User Avatar Update" ON storage.objects
 CREATE POLICY "User Avatar Delete" ON storage.objects
   FOR DELETE TO authenticated
   USING (bucket_id = 'avatars' AND split_part(name, '/', 1) = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Company Logos Public View" ON storage.objects;
+CREATE POLICY "Company Logos Public View" ON storage.objects FOR SELECT USING (bucket_id = 'company-logos');
+DROP POLICY IF EXISTS "Company Logos Tenant Upload" ON storage.objects;
+CREATE POLICY "Company Logos Tenant Upload" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'company-logos' AND split_part(name, '/', 1) = public.current_user_company_id()::text);
+DROP POLICY IF EXISTS "Company Logos Tenant Update" ON storage.objects;
+CREATE POLICY "Company Logos Tenant Update" ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'company-logos' AND split_part(name, '/', 1) = public.current_user_company_id()::text)
+  WITH CHECK (bucket_id = 'company-logos' AND split_part(name, '/', 1) = public.current_user_company_id()::text);
+DROP POLICY IF EXISTS "Company Logos Tenant Delete" ON storage.objects;
+CREATE POLICY "Company Logos Tenant Delete" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'company-logos' AND split_part(name, '/', 1) = public.current_user_company_id()::text);
 
 DROP POLICY IF EXISTS "Tenant Documents View" ON storage.objects;
 DROP POLICY IF EXISTS "Tenant Documents Upload" ON storage.objects;

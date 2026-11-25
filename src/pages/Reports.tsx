@@ -23,6 +23,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { MonthlyComparisonChart, CategoryDonutChart } from '../components/common/ChartComponents';
 import { getLocalDateISO } from '../utils/dates';
+import { ClientStatus } from '../types';
 
 export const Reports: React.FC = () => {
   const { company } = useAuth();
@@ -38,6 +39,13 @@ export const Reports: React.FC = () => {
 
   const formatBRL = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  const clientStatusLabels: Record<ClientStatus, string> = {
+    ativo: 'Ativo',
+    em_negociacao: 'Em negociação',
+    pendente: 'Pendente',
+    inativo: 'Inativo',
+  };
 
   // Filtered metrics computed dynamically from dataStore
   const reportData = useMemo(() => {
@@ -60,7 +68,7 @@ export const Reports: React.FC = () => {
     } else if (selectedReport === 'clients') {
       csvContent += 'ID,Nome,Empresa,Email,Telefone,Status,Receita_Total\n';
       clients.forEach((c) => {
-        csvContent += `"${c.id}","${c.name}","${c.company_name}","${c.email}","${c.phone}","${c.status}","${c.total_revenue}"\n`;
+        csvContent += `"${c.id}","${c.name}","${c.company_name}","${c.email}","${c.phone}","${clientStatusLabels[c.status]}","${c.total_revenue}"\n`;
       });
     } else if (selectedReport === 'tasks') {
       csvContent += 'ID,Titulo,Prioridade,Status,Prazo,Cliente\n';
@@ -276,7 +284,7 @@ export const Reports: React.FC = () => {
           { id: 'overview', label: 'Visão Geral & Lançamentos', icon: DollarSign },
           { id: 'clients', label: 'Carteira de Clientes', icon: Users },
           { id: 'tasks', label: 'Quadro de Tarefas & Prazos', icon: CheckCircle2 },
-          { id: 'projects', label: 'Operações em andamento', icon: Briefcase },
+          { id: 'projects', label: 'Projetos em andamento', icon: Briefcase },
         ].map((tab) => {
           const Icon = tab.icon;
           const isSel = selectedReport === tab.id;
@@ -302,7 +310,9 @@ export const Reports: React.FC = () => {
       <Card className="p-8 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-md space-y-6">
         {/* Report Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800 gap-4">
-          <div>
+          <div className="flex items-center gap-4">
+            {company?.logo_url && <img src={company.logo_url} alt={`Logotipo de ${company.name}`} className="h-12 w-12 rounded-lg border border-slate-200 bg-white object-contain p-1 print:border-0" />}
+            <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">
                 {company?.name || 'Sua empresa'}
@@ -312,8 +322,9 @@ export const Reports: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              CNPJ: {company?.cnpj || 'Não informado'} • Período: {reportData.startDate} até {reportData.endDate}
+              CNPJ: {company?.cnpj || 'Não informado'}{company?.address ? ` • ${company.address}` : ''}{company?.city ? ` • ${company.city}${company.state ? `/${company.state}` : ''}` : ''} • Período: {reportData.startDate} até {reportData.endDate}
             </p>
+            </div>
           </div>
 
           <div className="text-right text-xs">
@@ -381,7 +392,7 @@ export const Reports: React.FC = () => {
                       <td className="p-2.5 font-semibold text-slate-900 dark:text-white">{c.name}</td>
                       <td className="p-2.5 text-slate-500">{c.company_name}</td>
                       <td className="p-2.5 text-slate-400">{c.email} • {c.phone}</td>
-                      <td className="p-2.5 font-bold uppercase text-[10px] text-slate-500">{c.status}</td>
+                      <td className="p-2.5 font-bold text-[10px] text-slate-500">{clientStatusLabels[c.status]}</td>
                       <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">
                         {formatBRL(c.total_revenue)}
                       </td>
@@ -426,13 +437,13 @@ export const Reports: React.FC = () => {
         {selectedReport === 'projects' && (
           <div className="space-y-4">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Acompanhamento das operações ({projects.length} registros)
+              Acompanhamento das projetos ({projects.length} registros)
             </h4>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 font-semibold uppercase text-[10px]">
                   <tr>
-                    <th className="p-2.5">Operação</th>
+                    <th className="p-2.5">Projeto</th>
                     <th className="p-2.5">Cliente</th>
                     <th className="p-2.5">Progresso</th>
                     <th className="p-2.5">Prazo</th>

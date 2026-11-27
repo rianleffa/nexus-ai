@@ -1,3 +1,4 @@
+import { formatTimeBR } from '../../utils/dates';
 import React, { useState, useEffect } from 'react';
 import {
   Search,
@@ -51,7 +52,7 @@ export const Topbar: React.FC<TopbarProps> = ({
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileSidebar}
-          aria-label="Abrir menu"
+          aria-label="Abrir menu" title="Abrir menu"
           className="lg:hidden p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         >
           <Menu className="w-5 h-5" />
@@ -79,7 +80,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           size="sm"
           onClick={onOpenQuickCreate}
           leftIcon={<Plus className="w-4 h-4" />}
-          aria-label="Criar novo registro"
+          aria-label="Criar novo registro" title="Criar novo registro"
           className="shadow-sm hover:shadow-glow px-2 sm:px-3"
         >
           <span className="hidden sm:inline">Novo</span>
@@ -103,7 +104,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            aria-label={`Notificações${unreadCount ? `, ${unreadCount} não lidas` : ''}`}
+            title="Notificações" aria-label={`Notificações${unreadCount ? `, ${unreadCount} não lidas` : ''}`}
             className="relative p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <Bell className="w-4 h-4" />
@@ -154,10 +155,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                           {notif.title}
                         </span>
                         <span className="text-[10px] text-slate-400">
-                          {new Date(notif.created_at).toLocaleTimeString('pt-BR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {formatTimeBR(notif.created_at)}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
@@ -173,7 +171,7 @@ export const Topbar: React.FC<TopbarProps> = ({
 
         <button
           onClick={() => onNavigate('settings')}
-          aria-label="Abrir perfil e configurações"
+          aria-label="Abrir perfil e configurações" title="Abrir perfil e configurações"
           className="pl-1.5 border-l border-slate-200 dark:border-slate-800 flex items-center gap-2 text-left"
         >
           <UserAvatar name={user?.name || 'Usuário'} avatarUrl={user?.avatar_url} size="sm" />

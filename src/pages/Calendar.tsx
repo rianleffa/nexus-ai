@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
@@ -96,6 +97,23 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
     );
   }, [eventDate, startTime, duration, editingEvent, events]);
 
+  const eventWriteLock = useRef(false);
+  const [savingEvent, setSavingEvent] = useState(false);
+
+  const withEventWrite = async (write: () => Promise<void>) => {
+    if (eventWriteLock.current) return;
+    eventWriteLock.current = true;
+    setSavingEvent(true);
+    try {
+      await write();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Não foi possível salvar o compromisso.', 'error');
+    } finally {
+      eventWriteLock.current = false;
+      setSavingEvent(false);
+    }
+  };
+
   // Form submit (Create or Update)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,44 +132,47 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
       if (client) finalClientId = client.id;
     }
 
-    if (editingEvent) {
-      dataStore.updateCalendarEvent(editingEvent.id, {
-        title: title.trim(),
-        client_name: clientName.trim() || undefined,
-        client_id: finalClientId,
-        event_date: eventDate,
-        start_time: startTime,
-        duration_minutes: Number(duration) || 60,
-        event_type: eventType,
-        location: location.trim() || undefined,
-        description: description.trim(),
-      });
-      showToast(`Compromisso "${title}" atualizado com sucesso!`, 'success');
-      setEditingEvent(null);
-    } else {
-      dataStore.createCalendarEvent({
-        title: title.trim(),
-        client_name: clientName.trim() || undefined,
-        client_id: finalClientId,
-        event_date: eventDate,
-        start_time: startTime,
-        duration_minutes: Number(duration) || 60,
-        event_type: eventType,
-        location: location.trim() || undefined,
-        description: description.trim(),
-        status: 'agendado',
-        user_id: user?.id || dataStore.getUser().id,
-        user_name: user?.name || 'Usuário',
-      });
-      showToast(`Compromisso "${title}" agendado com sucesso!`, 'success');
-      setIsCreateModalOpen(false);
-    }
+    void withEventWrite(async () => {
+      if (editingEvent) {
+        const updated = await dataStore.updateCalendarEvent(editingEvent.id, {
+          title: title.trim(),
+          client_name: clientName.trim() || undefined,
+          client_id: finalClientId,
+          event_date: eventDate,
+          start_time: startTime,
+          duration_minutes: Number(duration) || 60,
+          event_type: eventType,
+          location: location.trim() || undefined,
+          description: description.trim(),
+        });
+        if (!updated) throw new Error('Compromisso não encontrado.');
+        showToast(`Compromisso "${title}" atualizado com sucesso!`, 'success');
+        setEditingEvent(null);
+      } else {
+        await dataStore.createCalendarEvent({
+          title: title.trim(),
+          client_name: clientName.trim() || undefined,
+          client_id: finalClientId,
+          event_date: eventDate,
+          start_time: startTime,
+          duration_minutes: Number(duration) || 60,
+          event_type: eventType,
+          location: location.trim() || undefined,
+          description: description.trim(),
+          status: 'agendado',
+          user_id: user?.id || dataStore.getUser().id,
+          user_name: user?.name || 'Usuário',
+        });
+        showToast(`Compromisso "${title}" agendado com sucesso!`, 'success');
+        setIsCreateModalOpen(false);
+      }
 
-    // Reset fields
-    setTitle('');
-    setClientName('');
-    setClientId('');
-    setDescription('');
+      // Reset fields
+      setTitle('');
+      setClientName('');
+      setClientId('');
+      setDescription('');
+    });
   };
 
   const openCreateModalForDate = (dateStr: string) => {
@@ -182,16 +203,21 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
   };
 
   const handleCancelEvent = (id: string, eventTitle: string) => {
-    if (confirm(`Deseja realmente cancelar o compromisso "${eventTitle}"?`)) {
-      dataStore.cancelCalendarEvent(id);
-      showToast('Compromisso cancelado na agenda.', 'info');
-    }
+    if (eventWriteLock.current || !window.confirm(`Deseja cancelar o compromisso "${eventTitle}"?`)) return;
+    void withEventWrite(async () => {
+      if (await dataStore.updateCalendarEvent(id, { status: 'cancelado' })) {
+        showToast('Compromisso cancelado na agenda.', 'success');
+      }
+    });
   };
 
-  const handleToggleComplete = (evt: CalendarEvent) => {
-    const newStatus = evt.status === 'concluido' ? 'agendado' : 'concluido';
-    dataStore.updateCalendarEvent(evt.id, { status: newStatus });
-    showToast(`Compromisso marcado como ${newStatus === 'concluido' ? 'concluído' : 'agendado'}!`, 'success');
+  const handleToggleComplete = (event: CalendarEvent) => {
+    const status = event.status === 'concluido' ? 'agendado' : 'concluido';
+    void withEventWrite(async () => {
+      if (await dataStore.updateCalendarEvent(event.id, { status })) {
+        showToast(status === 'concluido' ? 'Compromisso concluído.' : 'Compromisso reaberto.', 'success');
+      }
+    });
   };
 
   // Month grid generation
@@ -641,7 +667,7 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
             >
               Cancelar
             </Button>
-            <Button variant="primary" type="submit">
+            <Button variant="primary" type="submit" isLoading={savingEvent}>
               {editingEvent ? 'Salvar Alterações' : 'Agendar Compromisso'}
             </Button>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ArrowLeft, KeyRound } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -15,44 +15,53 @@ export const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({ onBackToLogi
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const submitting = useRef(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting.current) return;
     if (password !== confirmPassword) {
       setError('As senhas digitadas não coincidem.');
       return;
     }
 
     setError('');
+    submitting.current = true;
     setIsLoading(true);
-    const result = await completePasswordRecovery(password);
-    setIsLoading(false);
-    if (result.success) setIsComplete(true);
-    else setError(result.error || 'Não foi possível atualizar sua senha.');
+    try {
+      const result = await completePasswordRecovery(password);
+      if (result.success) setIsComplete(true);
+      else setError(result.error || 'Não foi possível atualizar sua senha.');
+    } catch {
+      setError('Não foi possível atualizar sua senha. Tente novamente.');
+    } finally {
+      submitting.current = false;
+      setIsLoading(false);
+    }
   };
 
   return (
     <main id="main-content" className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-900 p-4">
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl">
+      <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-5 sm:p-8 shadow-2xl">
         <div className="text-center space-y-2 mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-brand-600 text-white mb-2">
             <KeyRound className="w-6 h-6" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Redefinir senha</h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-600">
             {isComplete ? 'Sua senha foi atualizada com segurança.' : 'Escolha uma nova senha para sua conta.'}
           </p>
         </div>
 
         {error && (
-          <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-950/30 px-4 py-3 text-sm text-rose-800" role="alert" aria-live="polite">
+          <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert" aria-live="polite">
             {error}
           </div>
         )}
 
         {isComplete ? (
           <div className="space-y-4">
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800" role="status">
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
               Agora entre usando sua nova senha.
             </div>
             <Button type="button" variant="primary" size="md" className="w-full" onClick={onBackToLogin}>

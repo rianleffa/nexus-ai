@@ -408,14 +408,14 @@ class SupabaseSyncService {
   }
 
   // Projetos
-  public async syncProject(action: 'upsert' | 'delete', project: Partial<Project> & { id: string }) {
+  public async syncProject(action: 'upsert' | 'delete', project: Partial<Project> & { id: string }, confirmInsert = false) {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       if (action === 'delete') {
         const { error } = await supabase.from('projects').delete().eq('id', project.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('projects').upsert({
+        const payload = {
           id: project.id,
           company_id: project.company_id,
           client_id: project.client_id || null,
@@ -429,25 +429,30 @@ class SupabaseSyncService {
           start_date: project.start_date || null,
           due_date: project.due_date || null,
           updated_at: new Date().toISOString(),
-        });
+        };
+        const query = supabase.from('projects');
+        const { error } = confirmInsert
+          ? await query.insert(payload).select('id').abortSignal(AbortSignal.timeout(15_000)).single()
+          : await query.upsert(payload);
         if (error) throw error;
       }
       this.setStatus('connected');
     } catch (err) {
       this.setStatus('error');
+      if (confirmInsert) throw new Error('Não foi possível confirmar a criação do projeto. Atualize a lista antes de tentar novamente.');
       console.warn('[SupabaseSync] Erro ao sincronizar projeto:', err);
     }
   }
 
   // Tarefas
-  public async syncTask(action: 'upsert' | 'delete', task: Partial<Task> & { id: string }) {
+  public async syncTask(action: 'upsert' | 'delete', task: Partial<Task> & { id: string }, write: 'insert' | 'update' = 'update') {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       if (action === 'delete') {
-        const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+        const { error } = await supabase.from('tasks').delete().eq('id', task.id).eq('company_id', task.company_id!).select('id').abortSignal(AbortSignal.timeout(15_000)).single();
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('tasks').upsert({
+        const payload = {
           id: task.id,
           company_id: task.company_id,
           project_id: task.project_id || null,
@@ -460,25 +465,29 @@ class SupabaseSyncService {
           due_date: task.due_date || null,
           tags: task.tags || [],
           updated_at: new Date().toISOString(),
-        });
+        };
+        const query = supabase.from('tasks');
+        const { id, company_id, ...details } = payload;
+        const mutation = write === 'insert' ? query.insert(payload) : query.update(details).eq('id', id).eq('company_id', company_id!);
+        const { error } = await mutation.select('id').abortSignal(AbortSignal.timeout(15_000)).single();
         if (error) throw error;
       }
       this.setStatus('connected');
     } catch (err) {
       this.setStatus('error');
-      console.warn('[SupabaseSync] Erro ao sincronizar tarefa:', err);
+      throw new Error('Não foi possível confirmar a alteração da tarefa. Atualize a lista antes de tentar novamente.', { cause: err });
     }
   }
 
   // Agenda / Compromissos
-  public async syncCalendarEvent(action: 'upsert' | 'delete', event: Partial<CalendarEvent> & { id: string }) {
+  public async syncCalendarEvent(action: 'upsert' | 'delete', event: Partial<CalendarEvent> & { id: string }, write?: 'insert' | 'update') {
     if (!isSupabaseConfigured || !supabase) return;
     try {
       if (action === 'delete') {
         const { error } = await supabase.from('calendar_events').delete().eq('id', event.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('calendar_events').upsert({
+        const payload = {
           id: event.id,
           company_id: event.company_id,
           client_id: event.client_id || null,
@@ -492,12 +501,19 @@ class SupabaseSyncService {
           location: event.location,
           status: event.status || 'agendado',
           updated_at: new Date().toISOString(),
-        });
+        };
+        const query = supabase.from('calendar_events');
+        const { id, company_id, ...details } = payload;
+        const { error } = write
+          ? await (write === 'insert' ? query.insert(payload) : query.update(details).eq('id', id).eq('company_id', company_id!))
+            .select('id').abortSignal(AbortSignal.timeout(15_000)).single()
+          : await query.upsert(payload);
         if (error) throw error;
       }
       this.setStatus('connected');
     } catch (err) {
       this.setStatus('error');
+      if (write) throw new Error('Não foi possível confirmar o compromisso. Atualize a agenda antes de tentar novamente.', { cause: err });
       console.warn('[SupabaseSync] Erro ao sincronizar evento da agenda:', err);
     }
   }

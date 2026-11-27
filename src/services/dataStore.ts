@@ -727,17 +727,19 @@ class DataStore {
     return this.getProjects().find((p) => p.id === id);
   }
 
-  public createProject(data: Omit<Project, 'id' | 'company_id' | 'created_at'>): Project {
+  public async createProject(data: Omit<Project, 'id' | 'company_id' | 'created_at'>): Promise<Project> {
     const newProj: Project = {
       id: createRecordId(),
       company_id: this.company.id,
       ...data,
       created_at: new Date().toISOString(),
     };
+    await supabaseSync.syncProject('upsert', newProj, true);
+    if (this.company.id !== newProj.company_id) return newProj;
     this.projects.unshift(newProj);
     this.addActivity(`Projeto "${newProj.name}" foi criada.`, 'task');
     this.persist();
-    supabaseSync.syncProject('upsert', newProj);
+
     return newProj;
   }
 
@@ -782,53 +784,62 @@ class DataStore {
     return this.tasks.find((t) => t.id === id);
   }
 
-  public createTask(data: Omit<Task, 'id' | 'company_id' | 'created_at'>): Task {
-    const newTask: Task = {
+  private pendingTaskWrites = new Set<string>();
+
+  public async createTask(data: Omit<Task, 'id' | 'company_id' | 'created_at'>): Promise<Task> {
+    const created: Task = {
       id: createRecordId(),
       company_id: this.company.id,
       ...data,
       created_at: new Date().toISOString(),
     };
-    this.tasks.unshift(newTask);
-    this.addActivity(`Tarefa "${newTask.title}" adicionada.`, 'task');
-    this.persist();
-    supabaseSync.syncTask('upsert', newTask);
-    return newTask;
-  }
-
-  public updateTask(id: string, updates: Partial<Task>): Task | null {
-    const idx = this.tasks.findIndex((t) => t.id === id);
-    if (idx === -1) return null;
-    this.tasks[idx] = {
-      ...this.tasks[idx],
-      ...updates,
-      updated_at: new Date().toISOString(),
-    };
-    this.persist();
-    supabaseSync.syncTask('upsert', this.tasks[idx]);
-    return this.tasks[idx];
-  }
-
-  public completeTask(id: string): Task | null {
-    const task = this.getTask(id);
-    if (!task) return null;
-    task.status = 'concluido';
-    task.updated_at = new Date().toISOString();
-    this.addActivity(`Tarefa "${task.title}" concluída.`, 'task');
-    this.persist();
-    supabaseSync.syncTask('upsert', task);
-    return task;
-  }
-
-  public deleteTask(id: string): boolean {
-    const initialLen = this.tasks.length;
-    this.tasks = this.tasks.filter((t) => t.id !== id);
-    if (this.tasks.length !== initialLen) {
+    await supabaseSync.syncTask('upsert', created, 'insert');
+    if (this.company.id === created.company_id) {
+      this.tasks.unshift(created);
+      this.addActivity(`Tarefa "${created.title}" adicionada.`, 'task');
       this.persist();
-      supabaseSync.syncTask('delete', { id });
-      return true;
     }
-    return false;
+    return created;
+  }
+
+  public async updateTask(id: string, updates: Partial<Task>): Promise<Task | null> {
+    const current = this.getTask(id);
+    if (!current || this.pendingTaskWrites.has(id)) return null;
+    const saved = { ...current, ...updates, updated_at: new Date().toISOString() };
+    this.pendingTaskWrites.add(id);
+    try {
+      await supabaseSync.syncTask('upsert', saved);
+      if (this.company.id === current.company_id) {
+        this.tasks = this.tasks.map((task) => task.id === id ? saved : task);
+        if (saved.status === 'concluido' && current.status !== saved.status) {
+          this.addActivity(`Tarefa "${saved.title}" concluída.`, 'task');
+        }
+        this.persist();
+      }
+      return saved;
+    } finally {
+      this.pendingTaskWrites.delete(id);
+    }
+  }
+
+  public completeTask(id: string): Promise<Task | null> {
+    return this.updateTask(id, { status: 'concluido' });
+  }
+
+  public async deleteTask(id: string): Promise<boolean> {
+    const current = this.getTask(id);
+    if (!current || this.pendingTaskWrites.has(id)) return false;
+    this.pendingTaskWrites.add(id);
+    try {
+      await supabaseSync.syncTask('delete', current);
+      if (this.company.id === current.company_id) {
+        this.tasks = this.tasks.filter((task) => task.id !== id);
+        this.persist();
+      }
+      return true;
+    } finally {
+      this.pendingTaskWrites.delete(id);
+    }
   }
 
   // ----------------------------------------------------------------------------
@@ -876,7 +887,7 @@ class DataStore {
     return { hasConflict: false };
   }
 
-  public createCalendarEvent(data: Omit<CalendarEvent, 'id' | 'company_id' | 'created_at'>): CalendarEvent {
+  public async createCalendarEvent(data: Omit<CalendarEvent, 'id' | 'company_id' | 'created_at'>): Promise<CalendarEvent> {
     const duration = data.duration_minutes || 60;
     const end_time = data.end_time || this.minutesToTime(this.timeToMinutes(data.start_time) + duration);
 
@@ -888,32 +899,33 @@ class DataStore {
       end_time,
       created_at: new Date().toISOString(),
     };
+    await supabaseSync.syncCalendarEvent('upsert', newEvent, 'insert');
+    if (this.company.id !== newEvent.company_id) return newEvent;
     this.events.unshift(newEvent);
     this.addActivity(`Novo compromisso "${newEvent.title}" agendado para ${newEvent.event_date} às ${newEvent.start_time}.`, 'calendar');
     this.persist();
-    supabaseSync.syncCalendarEvent('upsert', newEvent);
+
     return newEvent;
   }
 
-  public updateCalendarEvent(id: string, updates: Partial<CalendarEvent>): CalendarEvent | null {
-    const idx = this.events.findIndex((e) => e.id === id);
-    if (idx === -1) return null;
-
-    const current = this.events[idx];
+  public async updateCalendarEvent(id: string, updates: Partial<CalendarEvent>): Promise<CalendarEvent | null> {
+    const current = this.events.find((event) => event.id === id);
+    if (!current) return null;
     const duration = updates.duration_minutes || current.duration_minutes || 60;
     const startTime = updates.start_time || current.start_time;
-    const endTime = updates.end_time || this.minutesToTime(this.timeToMinutes(startTime) + duration);
-
-    this.events[idx] = {
+    const saved = {
       ...current,
       ...updates,
       duration_minutes: duration,
-      end_time: endTime,
+      end_time: updates.end_time || this.minutesToTime(this.timeToMinutes(startTime) + duration),
       updated_at: new Date().toISOString(),
     };
-    this.persist();
-    supabaseSync.syncCalendarEvent('upsert', this.events[idx]);
-    return this.events[idx];
+    await supabaseSync.syncCalendarEvent('upsert', saved, 'update');
+    if (this.company.id === current.company_id) {
+      this.events = this.events.map((event) => event.id === id ? saved : event);
+      this.persist();
+    }
+    return saved;
   }
 
   public rescheduleCalendarEvent(

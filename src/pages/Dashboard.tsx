@@ -133,11 +133,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const formatBRL = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
-  const handleToggleTaskComplete = (taskId: string, e: React.MouseEvent) => {
+  const handleToggleTaskComplete = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const completed = dataStore.completeTask(taskId);
-    if (completed) {
-      showToast(`Tarefa "${completed.title}" marcada como concluída!`, 'success');
+    try {
+      const completed = await dataStore.completeTask(taskId);
+      if (completed) showToast(`Tarefa "${completed.title}" marcada como concluída.`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Não foi possível concluir a tarefa.', 'error');
     }
   };
 

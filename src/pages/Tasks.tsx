@@ -23,7 +23,7 @@ import { TaskPriorityBadge, TaskStatusBadge } from '../components/ui/Badge';
 import { dataStore } from '../services/dataStore';
 import { Task, TaskPriority, TaskStatus } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
-import { getLocalDateISO } from '../utils/dates';
+import { getSaoPauloDateISO } from '../utils/dates';
 
 interface TasksProps {
   initialFilter?: string;
@@ -55,29 +55,29 @@ export const Tasks: React.FC<TasksProps> = ({
     return unsub;
   }, []);
 
-  const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
-    dataStore.updateTask(taskId, { status: newStatus });
-    showToast(`Status atualizado para ${formatStatus(newStatus)}!`, 'info');
-  };
-
-  const handleToggleComplete = (task: Task) => {
-    if (task.status === 'concluido') {
-      dataStore.updateTask(task.id, { status: 'a_fazer' });
-      showToast('Tarefa reaberta.', 'info');
-    } else {
-      dataStore.completeTask(task.id);
-      showToast(`Tarefa "${task.title}" concluída!`, 'success');
+  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+    try {
+      if (await dataStore.updateTask(taskId, { status: newStatus })) {
+        showToast(`Status atualizado para ${formatStatus(newStatus)}.`, 'success');
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Não foi possível alterar a tarefa.', 'error');
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Deseja excluir esta tarefa?')) {
-      dataStore.deleteTask(id);
-      showToast('Tarefa excluída.', 'info');
+  const handleToggleComplete = (task: Task) =>
+    handleStatusChange(task.id, task.status === 'concluido' ? 'a_fazer' : 'concluido');
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Deseja excluir esta tarefa?')) return;
+    try {
+      if (await dataStore.deleteTask(id)) showToast('Tarefa excluída.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Não foi possível excluir a tarefa.', 'error');
     }
   };
 
-  const todayStr = getLocalDateISO();
+  const todayStr = getSaoPauloDateISO();
 
   const filteredTasks = tasks.filter((t) => {
     const matchesSearch =

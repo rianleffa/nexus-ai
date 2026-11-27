@@ -54,8 +54,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     }
   }, [isOpen, defaultTab]);
 
-  const guardSubmit = (handler: (event: React.FormEvent<HTMLFormElement>) => void) =>
-    (event: React.FormEvent<HTMLFormElement>) => {
+  const guardSubmit = (handler: (event: React.FormEvent<HTMLFormElement>) => void | Promise<void>) =>
+    async (event: React.FormEvent<HTMLFormElement>) => {
       if (submittingRef.current) {
         event.preventDefault();
         return;
@@ -63,7 +63,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       submittingRef.current = true;
       setIsSubmitting(true);
       try {
-        handler(event);
+        await handler(event);
       } catch {
         showToast('Não foi possível salvar. Revise os dados e tente novamente.', 'error');
       } finally {
@@ -169,7 +169,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     onClose();
   };
 
-  const handleCreateProject = (e: React.FormEvent) => {
+  const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projName) return;
     const client = clients.find((c) => c.id === projClientId);
@@ -178,7 +178,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       showToast('Informe um orçamento válido (zero se ainda não definido).', 'warning');
       return;
     }
-    const p = dataStore.createProject({
+    const p = await dataStore.createProject({
       name: projName,
       client_id: client?.id,
       client_name: client?.name || 'Projeto interno',
@@ -197,13 +197,13 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     onClose();
   };
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskTitle) return;
     const client = clients.find((c) => c.id === taskClientId);
     const project = projects.find((p) => p.id === taskProjectId);
 
-    const t = dataStore.createTask({
+    const t = await dataStore.createTask({
       title: taskTitle,
       description: taskDesc,
       priority: taskPriority,
@@ -222,7 +222,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     onClose();
   };
 
-  const handleCreateEvent = (e: React.FormEvent) => {
+  const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventTitle) return;
     const client = clients.find((c) => c.id === eventClientId);
@@ -238,7 +238,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       return;
     }
 
-    const ev = dataStore.createCalendarEvent({
+    const ev = await dataStore.createCalendarEvent({
       title: eventTitle,
       event_date: eventDate,
       start_time: eventTime,

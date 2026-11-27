@@ -1,3 +1,5 @@
+import { formatStatus } from '../utils/status';
+import { formatDateBR, formatTimeBR } from '../utils/dates';
 import React, { useState, useEffect } from 'react';
 import {
   Users,
@@ -283,7 +285,7 @@ export const Clients: React.FC<ClientsProps> = ({
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-slate-400">
                         <span>Orçamento: R$ {p.budget.toLocaleString('pt-BR')}</span>
-                        <span>Prazo: {p.due_date}</span>
+                        <span>Prazo: {formatDateBR(p.due_date)}</span>
                       </div>
                       <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                         <div style={{ width: `${p.progress}%` }} className="h-full bg-brand-500 rounded-full" />
@@ -310,9 +312,9 @@ export const Clients: React.FC<ClientsProps> = ({
                     <div key={t.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{t.title}</p>
-                        <span className="text-[11px] text-slate-400">Prazo: {t.due_date}</span>
+                        <span className="text-[11px] text-slate-400">Prazo: {formatDateBR(t.due_date)}</span>
                       </div>
-                      <Badge variant={t.status === 'concluido' ? 'success' : 'warning'}>{t.status}</Badge>
+                      <Badge variant={t.status === 'concluido' ? 'success' : 'warning'}>{formatStatus(t.status)}</Badge>
                     </div>
                   ))}
                 </div>
@@ -335,9 +337,9 @@ export const Clients: React.FC<ClientsProps> = ({
                     <div key={e.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{e.title}</p>
-                        <span className="text-[11px] text-slate-400">{e.event_date} às {e.start_time} • {e.location}</span>
+                        <span className="text-[11px] text-slate-400">{formatDateBR(e.event_date)} às {formatTimeBR(e.start_time)} • {e.location}</span>
                       </div>
-                      <Badge variant="info">{e.status}</Badge>
+                      <Badge variant="info">{formatStatus(e.status)}</Badge>
                     </div>
                   ))}
                 </div>
@@ -360,7 +362,7 @@ export const Clients: React.FC<ClientsProps> = ({
                     <div key={tx.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{tx.description}</p>
-                        <span className="text-[11px] text-slate-400">{tx.due_date} • {tx.category} • {tx.status}</span>
+                        <span className="text-[11px] text-slate-400">{formatDateBR(tx.due_date)} • {tx.category} • {formatStatus(tx.status)}</span>
                       </div>
                       <span className={`font-bold ${tx.status === 'pago' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                         R$ {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -560,7 +562,7 @@ export const Clients: React.FC<ClientsProps> = ({
                         {client.phone}
                       </td>
                       <td className="px-5 py-3.5 text-slate-400 text-[11px]">
-                        {new Date(client.last_interaction).toLocaleDateString('pt-BR')}
+                        {formatDateBR(client.last_interaction)}
                       </td>
                       <td className="px-5 py-3.5">
                         <ClientStatusBadge status={client.status} />

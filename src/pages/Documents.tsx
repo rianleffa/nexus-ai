@@ -1,3 +1,4 @@
+import { formatDateBR } from '../utils/dates';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText,
@@ -35,6 +36,8 @@ const readFileAsDataUrl = (file: File): Promise<string> => new Promise((resolve,
   reader.onerror = () => reject(new Error('Não foi possível ler o arquivo selecionado.'));
   reader.readAsDataURL(file);
 });
+
+const categoryKey = (name: string) => name.trim().normalize('NFC').toLocaleLowerCase('pt-BR');
 
 interface DocumentsProps {
   onNavigate?: (page: string, prompt?: string, params?: Record<string, any>) => void;
@@ -252,11 +255,17 @@ export const Documents: React.FC<DocumentsProps> = ({ onNavigate }) => {
     }
   };
 
+  const visibleCategories = [...new Map(
+    [...documents.map((doc) => doc.category), ...categories]
+      .filter((name) => name.trim())
+      .map((name) => [categoryKey(name), name.trim()]),
+  ).values()];
+
   // Filter & Sort
   const filteredDocs = documents
     .filter((doc) => {
       const matchesCategory =
-        selectedCategory === 'all' || doc.category === selectedCategory;
+        selectedCategory === 'all' || categoryKey(doc.category) === categoryKey(selectedCategory);
       const matchesSearch =
         doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (doc.client_name && doc.client_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -331,8 +340,8 @@ export const Documents: React.FC<DocumentsProps> = ({ onNavigate }) => {
           <span className="text-[10px] text-slate-400">{documents.length} arquivos</span>
         </div>
 
-        {categories.map((cat) => {
-          const count = documents.filter((d) => d.category === cat).length;
+        {visibleCategories.map((cat) => {
+          const count = documents.filter((d) => categoryKey(d.category) === categoryKey(cat)).length;
           const isSel = selectedCategory === cat;
 
           return (
@@ -633,7 +642,7 @@ export const Documents: React.FC<DocumentsProps> = ({ onNavigate }) => {
                   <p className="text-xs text-slate-400 mt-1">A pré-visualização não está disponível para este tipo de arquivo.</p>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Enviado por: {previewDoc.uploaded_by || 'Administrador'} em{' '}
-                    {new Date(previewDoc.created_at).toLocaleDateString('pt-BR')}
+                    {formatDateBR(previewDoc.created_at)}
                   </p>
                 </div>
               </div>

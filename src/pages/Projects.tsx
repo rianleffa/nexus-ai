@@ -1,3 +1,5 @@
+import { formatStatus } from '../utils/status';
+import { formatDateBR, formatTimeBR } from '../utils/dates';
 import React, { useState, useEffect } from 'react';
 import {
   Calendar,
@@ -115,7 +117,7 @@ export const Projects: React.FC<ProjectsProps> = ({
                       {selectedProject.client_name || 'Projeto interno'}
                     </span>
                   )}
-                  {' • '}Início: {selectedProject.start_date} • Prazo final: {selectedProject.due_date}
+                  {' • '}Início: {formatDateBR(selectedProject.start_date)} • Prazo final: {formatDateBR(selectedProject.due_date)}
                 </p>
               </div>
 
@@ -167,11 +169,11 @@ export const Projects: React.FC<ProjectsProps> = ({
                     <div key={t.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{t.title}</p>
-                        <span className="text-[11px] text-slate-400">Prazo: {t.due_date}</span>
+                        <span className="text-[11px] text-slate-400">Prazo: {formatDateBR(t.due_date)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <TaskPriorityBadge priority={t.priority} />
-                        <Badge variant={t.status === 'concluido' ? 'success' : 'warning'}>{t.status}</Badge>
+                        <Badge variant={t.status === 'concluido' ? 'success' : 'warning'}>{formatStatus(t.status)}</Badge>
                       </div>
                     </div>
                   ))}
@@ -196,9 +198,9 @@ export const Projects: React.FC<ProjectsProps> = ({
                     <div key={e.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{e.title}</p>
-                        <span className="text-[11px] text-slate-400">{e.event_date} às {e.start_time} • {e.location}</span>
+                        <span className="text-[11px] text-slate-400">{formatDateBR(e.event_date)} às {formatTimeBR(e.start_time)} • {e.location}</span>
                       </div>
-                      <Badge variant="info">{e.status}</Badge>
+                      <Badge variant="info">{formatStatus(e.status)}</Badge>
                     </div>
                   ))}
                 </div>
@@ -233,7 +235,7 @@ export const Projects: React.FC<ProjectsProps> = ({
                     : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
-                {st === 'all' ? 'Todos' : st.replace('_', ' ')}
+                {st === 'all' ? 'Todos' : formatStatus(st)}
               </button>
             ))}
           </div>
@@ -279,7 +281,7 @@ export const Projects: React.FC<ProjectsProps> = ({
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-400">
                   <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" /> Prazo: {project.due_date}
+                    <Calendar className="w-3.5 h-3.5" /> Prazo: {formatDateBR(project.due_date)}
                   </span>
                   <span className="font-semibold text-slate-700 dark:text-slate-300">
                     Recursos: R$ {project.budget.toLocaleString('pt-BR')}

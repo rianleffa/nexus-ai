@@ -335,7 +335,7 @@ class DataStore {
       (t) => t.client_id === clientId || (clientName && t.client_name === clientName)
     );
 
-    const clientProjects = this.projects.filter(
+    const clientProjects = this.getProjects().filter(
       (p) => p.client_id === clientId || (clientName && p.client_name === clientName)
     );
     const projectsBudgetTotal = clientProjects.reduce((acc, p) => acc + p.budget, 0);
@@ -676,11 +676,22 @@ class DataStore {
   // Projects
   // ----------------------------------------------------------------------------
   public getProjects(): Project[] {
-    return [...this.projects];
+    const counts = new Map<string, { completed: number; total: number }>();
+    for (const task of this.tasks) {
+      if (!task.project_id || task.company_id !== this.company.id) continue;
+      const count = counts.get(task.project_id) ?? { completed: 0, total: 0 };
+      count.total += 1;
+      if (task.status === 'concluido') count.completed += 1;
+      counts.set(task.project_id, count);
+    }
+    return this.projects.map((project) => {
+      const count = counts.get(project.id);
+      return { ...project, progress: count ? Math.round(count.completed * 100 / count.total) : 0 };
+    });
   }
 
   public getProject(id: string): Project | undefined {
-    return this.projects.find((p) => p.id === id);
+    return this.getProjects().find((p) => p.id === id);
   }
 
   public createProject(data: Omit<Project, 'id' | 'company_id' | 'created_at'>): Project {
@@ -721,7 +732,17 @@ class DataStore {
   // Tasks
   // ----------------------------------------------------------------------------
   public getTasks(): Task[] {
-    return [...this.tasks];
+    const projects = new Map(this.projects.map((project) => [project.id, project]));
+    const clients = new Map(this.clients.map((client) => [client.id, client.name]));
+    return this.tasks.map((task) => {
+      const project = task.project_id ? projects.get(task.project_id) : undefined;
+      const clientId = task.client_id ?? project?.client_id;
+      return {
+        ...task,
+        project_name: project?.name ?? task.project_name,
+        client_name: (clientId ? clients.get(clientId) : undefined) ?? task.client_name ?? project?.client_name,
+      };
+    });
   }
 
   public getTask(id: string): Task | undefined {

@@ -1,3 +1,4 @@
+import { formatStatus } from '../../utils/status';
 import React, { useState, useEffect } from 'react';
 import { Search, X, Users, CheckSquare, Calendar, ArrowRight, FolderKanban } from 'lucide-react';
 import { dataStore } from '../../services/dataStore';
@@ -171,7 +172,7 @@ export const CommandSearchModal: React.FC<CommandSearchModalProps> = ({
                         <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-brand-500">
                           {p.name}
                         </div>
-                        <div className="text-[11px] text-slate-500">Progresso: {p.progress}% • Status: {p.status}</div>
+                        <div className="text-[11px] text-slate-500">Progresso: {p.progress}% • Status: {formatStatus(p.status)}</div>
                       </div>
                       <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-brand-500 group-hover:translate-x-1 transition-all" />
                     </div>

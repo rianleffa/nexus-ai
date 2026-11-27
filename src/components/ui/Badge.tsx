@@ -1,3 +1,4 @@
+import { formatStatus } from '../../utils/status';
 import React from 'react';
 import { ClientStatus, ProjectStatus, TaskPriority, TaskStatus, TransactionStatus } from '../../types';
 
@@ -50,13 +51,13 @@ export const Badge: React.FC<BadgeProps> = ({
 export const ClientStatusBadge: React.FC<{ status: ClientStatus }> = ({ status }) => {
   switch (status) {
     case 'ativo':
-      return <Badge variant="success" dot>Ativo</Badge>;
+      return <Badge variant="success" dot>{formatStatus(status)}</Badge>;
     case 'inativo':
-      return <Badge variant="default" dot>Inativo</Badge>;
+      return <Badge variant="default" dot>{formatStatus(status)}</Badge>;
     case 'em_negociacao':
-      return <Badge variant="info" dot>Em negociação</Badge>;
+      return <Badge variant="info" dot>{formatStatus(status)}</Badge>;
     case 'pendente':
-      return <Badge variant="warning" dot>Pendente</Badge>;
+      return <Badge variant="warning" dot>{formatStatus(status)}</Badge>;
   }
 };
 
@@ -76,36 +77,36 @@ export const TaskPriorityBadge: React.FC<{ priority: TaskPriority }> = ({ priori
 export const TaskStatusBadge: React.FC<{ status: TaskStatus }> = ({ status }) => {
   switch (status) {
     case 'concluido':
-      return <Badge variant="success">Concluído</Badge>;
+      return <Badge variant="success">{formatStatus(status)}</Badge>;
     case 'em_andamento':
-      return <Badge variant="info">Em Andamento</Badge>;
+      return <Badge variant="info">{formatStatus(status)}</Badge>;
     case 'a_fazer':
-      return <Badge variant="warning">A Fazer</Badge>;
+      return <Badge variant="warning">{formatStatus(status)}</Badge>;
     case 'backlog':
-      return <Badge variant="default">Backlog</Badge>;
+      return <Badge variant="default">{formatStatus(status)}</Badge>;
   }
 };
 
 export const ProjectStatusBadge: React.FC<{ status: ProjectStatus }> = ({ status }) => {
   switch (status) {
     case 'concluido':
-      return <Badge variant="success">Concluído</Badge>;
+      return <Badge variant="success">{formatStatus(status)}</Badge>;
     case 'em_andamento':
-      return <Badge variant="info">Em Andamento</Badge>;
+      return <Badge variant="info">{formatStatus(status)}</Badge>;
     case 'planejamento':
-      return <Badge variant="warning">Planejamento</Badge>;
+      return <Badge variant="warning">{formatStatus(status)}</Badge>;
     case 'pausado':
-      return <Badge variant="default">Pausado</Badge>;
+      return <Badge variant="default">{formatStatus(status)}</Badge>;
   }
 };
 
 export const TransactionStatusBadge: React.FC<{ status: TransactionStatus }> = ({ status }) => {
   switch (status) {
     case 'pago':
-      return <Badge variant="success">Pago</Badge>;
+      return <Badge variant="success">{formatStatus(status)}</Badge>;
     case 'pendente':
-      return <Badge variant="warning">Pendente</Badge>;
+      return <Badge variant="warning">{formatStatus(status)}</Badge>;
     case 'atrasado':
-      return <Badge variant="danger">Atrasado</Badge>;
+      return <Badge variant="danger">{formatStatus(status)}</Badge>;
   }
 };

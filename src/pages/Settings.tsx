@@ -515,10 +515,6 @@ export const Settings: React.FC = () => {
                 <p className="text-xs text-slate-500 dark:text-slate-400">A autenticação e as sessões são gerenciadas pelo provedor de login conectado.</p>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
-              <span className="text-slate-500 dark:text-slate-400">E-mail da conta</span>
-              <p className="mt-1 font-semibold text-slate-900 dark:text-white">{user?.email || 'Não disponível'}</p>
-            </div>
           </Card>
 
           <Card className="p-6 space-y-4">

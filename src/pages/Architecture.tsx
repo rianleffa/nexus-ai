@@ -1,3 +1,5 @@
+import { formatStatus } from '../utils/status';
+import { formatTimeBR } from '../utils/dates';
 import React, { useState } from 'react';
 import {
   Cpu,
@@ -189,7 +191,7 @@ export const Architecture: React.FC = () => {
                 {actionLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="px-4 py-2.5 text-slate-400">
-                      {new Date(log.created_at).toLocaleTimeString('pt-BR')}
+                      {formatTimeBR(log.created_at)}
                     </td>
                     <td className="px-4 py-2.5 font-bold text-brand-500">
                       {log.tool_name}
@@ -207,7 +209,7 @@ export const Architecture: React.FC = () => {
                             : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                         }`}
                       >
-                        {log.status}
+                        {formatStatus(log.status)}
                       </span>
                     </td>
                   </tr>

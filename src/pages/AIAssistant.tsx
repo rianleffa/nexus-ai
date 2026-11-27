@@ -1,3 +1,4 @@
+import { formatTimeBR } from '../utils/dates';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Send,
@@ -66,7 +67,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
     {
       id: 'seed-01',
       sender: 'assistant',
-      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: formatTimeBR(new Date()),
       content:
         `Olá, **${user?.name.split(' ')[0] || 'bem-vindo(a)'}**! Sou o gestor virtual do **NEXUS AI** para **${company?.name || 'sua empresa'}**.\n\n` +
         `Posso consultar e atualizar informações da empresa, além de executar cadastros e alterações simples pelo chat. Para exclusões, operações financeiras e outras ações sensíveis, vou pedir sua confirmação.`,
@@ -105,7 +106,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       id: `user-${Date.now()}`,
       sender: 'user',
       content: textToSend,
-      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: formatTimeBR(new Date()),
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -137,7 +138,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
           sender: 'assistant',
           content: 'Não foi possível concluir a operação. Tente novamente.',
           feedback: 'error',
-          timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          timestamp: formatTimeBR(new Date()),
         },
       ]);
     } finally {
@@ -233,7 +234,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       setMessages([{
         id: `new-${Date.now()}`,
         sender: 'assistant',
-        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: formatTimeBR(new Date()),
         content: 'Histórico reiniciado. Como posso ajudar com a gestão da empresa agora?',
       }]);
     } catch {

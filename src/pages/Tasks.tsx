@@ -1,3 +1,5 @@
+import { formatStatus } from '../utils/status';
+import { formatDateBR } from '../utils/dates';
 import React, { useState, useEffect } from 'react';
 import {
   CheckSquare,
@@ -55,7 +57,7 @@ export const Tasks: React.FC<TasksProps> = ({
 
   const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
     dataStore.updateTask(taskId, { status: newStatus });
-    showToast(`Status atualizado para ${newStatus.replace('_', ' ')}!`, 'info');
+    showToast(`Status atualizado para ${formatStatus(newStatus)}!`, 'info');
   };
 
   const handleToggleComplete = (task: Task) => {
@@ -262,7 +264,7 @@ export const Tasks: React.FC<TasksProps> = ({
 
                           <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
                             <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> {task.due_date}
+                              <Clock className="w-3 h-3" /> {formatDateBR(task.due_date)}
                             </span>
                             {(task.client_name || task.project_name) && (
                               <span className="truncate max-w-[120px] font-medium text-slate-600 dark:text-slate-300">
@@ -328,13 +330,13 @@ export const Tasks: React.FC<TasksProps> = ({
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-slate-600 dark:text-slate-300">
-                      {task.project_name || task.client_name || 'Geral'}
+                      {[task.client_name, task.project_name].filter(Boolean).join(' / ') || 'Geral'}
                     </td>
                     <td className="px-5 py-3.5">
                       <TaskPriorityBadge priority={task.priority} />
                     </td>
                     <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
-                      {task.due_date}
+                      {formatDateBR(task.due_date)}
                     </td>
                     <td className="px-5 py-3.5">
                       <TaskStatusBadge status={task.status} />

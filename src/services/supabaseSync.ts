@@ -155,6 +155,7 @@ class SupabaseSyncService {
           id: c.id,
           company_id: c.company_id,
           name: c.name,
+          photo_path: c.photo_path ?? null,
           company_name: c.company_name,
           document: c.document,
           email: c.email,
@@ -336,8 +337,11 @@ class SupabaseSyncService {
   // --------------------------------------------------------------------------
 
   // Clientes
-  public async syncClient(action: 'upsert' | 'delete', client: Partial<Client> & { id: string }) {
-    if (!isSupabaseConfigured || !supabase) return;
+  public async syncClient(action: 'upsert' | 'delete', client: Partial<Client> & { id: string }, photoChange?: { previousPath?: string | null }) {
+    if (!isSupabaseConfigured || !supabase) {
+      if (photoChange) throw new Error('O banco de dados em nuvem não está disponível.');
+      return;
+    }
     try {
       if (action === 'delete') {
         const { error } = await supabase.from('clients').delete().eq('id', client.id);
@@ -345,11 +349,12 @@ class SupabaseSyncService {
       } else {
         const { data: authData, error: authError } = await supabase.auth.getUser();
         if (authError || !authData.user) throw authError || new Error('Sessão do usuário não encontrada.');
-        const { error } = await supabase.from('clients').upsert({
+        const payload = {
           id: client.id,
           company_id: client.company_id,
           user_id: authData.user.id,
           name: client.name,
+          ...(photoChange ? { photo_path: client.photo_path } : {}),
           company_name: client.company_name,
           document: client.document,
           email: client.email,
@@ -360,12 +365,35 @@ class SupabaseSyncService {
           total_revenue: client.total_revenue || 0,
           last_interaction: client.last_interaction || new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
-        if (error) throw error;
+        };
+        if (photoChange) {
+          const table = supabase.from('clients');
+          const pending = photoChange.previousPath === undefined
+            ? table.insert(payload)
+            : table.update({
+                name: payload.name,
+                company_name: payload.company_name,
+                document: payload.document,
+                email: payload.email,
+                phone: payload.phone,
+                address: payload.address,
+                notes: payload.notes,
+                status: payload.status,
+                photo_path: client.photo_path,
+                updated_at: payload.updated_at,
+              }).eq('id', client.id).eq('company_id', client.company_id!)
+                .filter('photo_path', photoChange.previousPath === null ? 'is' : 'eq', photoChange.previousPath);
+          const { error } = await pending.select('id').single();
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('clients').upsert(payload);
+          if (error) throw error;
+        }
       }
       this.setStatus('connected');
     } catch (err) {
       this.setStatus('error');
+      if (photoChange) throw new Error('Não foi possível confirmar a gravação do cliente. Atualize a lista antes de tentar novamente.');
       console.warn('[SupabaseSync] Erro ao sincronizar cliente:', err);
     }
   }

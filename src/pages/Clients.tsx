@@ -1,7 +1,7 @@
-import { UserAvatar } from '../components/common/UserAvatar';
+import { ClientPhoto, ClientPhotoField } from '../components/common/ClientPhoto';
 import { formatStatus } from '../utils/status';
 import { formatDateBR, formatTimeBR } from '../utils/dates';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users,
   Search,
@@ -51,6 +51,9 @@ export const Clients: React.FC<ClientsProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | ClientStatus>(initialFilter || 'all');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [photo, setPhoto] = useState<File | null>();
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const photoLock = useRef(false);
   const [clientDraft, setClientDraft] = useState({
     name: '',
     company_name: '',
@@ -65,6 +68,7 @@ export const Clients: React.FC<ClientsProps> = ({
 
   const openClientEditor = (client: Client) => {
     setSelectedClient(client);
+    setPhoto(undefined);
     setClientDraft({
       name: client.name,
       company_name: client.company_name,
@@ -78,14 +82,15 @@ export const Clients: React.FC<ClientsProps> = ({
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateClient = (event: React.FormEvent) => {
+  const handleUpdateClient = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (photoLock.current) return;
     if (!selectedClient || !clientDraft.name.trim() || !clientDraft.company_name.trim() || !clientDraft.email.trim()) {
       showToast('Preencha nome, empresa e e-mail do cliente.', 'warning');
       return;
     }
 
-    const updated = dataStore.updateClient(selectedClient.id, {
+    const draft = {
       ...clientDraft,
       name: clientDraft.name.trim(),
       company_name: clientDraft.company_name.trim(),
@@ -94,7 +99,22 @@ export const Clients: React.FC<ClientsProps> = ({
       document: clientDraft.document.trim(),
       address: clientDraft.address.trim(),
       notes: clientDraft.notes.trim(),
-    });
+    };
+
+    let updated: Client | null;
+    try {
+      photoLock.current = true;
+      setSavingPhoto(true);
+      updated = photo === undefined
+        ? dataStore.updateClient(selectedClient.id, draft)
+        : await dataStore.saveClientPhoto(draft, photo, selectedClient.id);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Não foi possível salvar a imagem.', 'error');
+      return;
+    } finally {
+      photoLock.current = false;
+      setSavingPhoto(false);
+    }
 
     if (!updated) {
       showToast('Não foi possível atualizar este cliente.', 'error');
@@ -199,7 +219,7 @@ export const Clients: React.FC<ClientsProps> = ({
           <Card className="p-6 space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-4">
-                <UserAvatar name={selectedClient.name} size="xl" />
+                <ClientPhoto name={selectedClient.name} path={selectedClient.photo_path} size="xl" />
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -575,7 +595,7 @@ export const Clients: React.FC<ClientsProps> = ({
                     >
                       <td className="px-5 py-3.5 font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-500">
                         <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedClient(client); }} className="flex items-center gap-2 text-left">
-                          <UserAvatar name={client.name} size="sm" />
+                          <ClientPhoto name={client.name} path={client.photo_path} size="sm" />
                           <span>{client.name}</span>
                         </button>
                       </td>
@@ -625,12 +645,13 @@ export const Clients: React.FC<ClientsProps> = ({
 
       <Modal
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={() => { if (!photoLock.current) setIsEditModalOpen(false); }}
         title="Editar cliente"
         subtitle="Atualize os dados comerciais e de contato."
         maxWidth="2xl"
       >
         <form onSubmit={handleUpdateClient} className="space-y-4">
+          {isEditModalOpen && <ClientPhotoField name={clientDraft.name} path={selectedClient?.photo_path} value={photo} onChange={setPhoto} disabled={savingPhoto} />}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Nome do contato" value={clientDraft.name} onChange={(event) => setClientDraft({ ...clientDraft, name: event.target.value })} required />
             <Input label="Empresa" value={clientDraft.company_name} onChange={(event) => setClientDraft({ ...clientDraft, company_name: event.target.value })} required />
@@ -657,7 +678,7 @@ export const Clients: React.FC<ClientsProps> = ({
           </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={() => setIsEditModalOpen(false)}>Cancelar</Button>
-            <Button variant="primary" type="submit">Salvar alterações</Button>
+            <Button variant="primary" type="submit" isLoading={savingPhoto}>Salvar alterações</Button>
           </div>
         </form>
       </Modal>

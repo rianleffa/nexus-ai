@@ -1,3 +1,4 @@
+import { ClientPhotoField } from '../common/ClientPhoto';
 import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -39,6 +40,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [activeTab, setActiveTab] = useState<QuickCreateTab>(defaultTab);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const clientPhotoLock = useRef(false);
+  const [clientPhoto, setClientPhoto] = useState<File | null>();
   const { showToast } = useNotification();
   const { user } = useAuth();
 
@@ -119,13 +122,14 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [expStatus, setExpStatus] = useState<'pago' | 'pendente'>('pendente');
 
   // Handlers
-  const handleCreateClient = (e: React.FormEvent) => {
+  const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (clientPhotoLock.current) return;
     if (!clientName.trim() || !clientCompany.trim() || !clientEmail.trim()) {
       showToast('Preencha nome, empresa e e-mail do cliente.', 'warning');
       return;
     }
-    const c = dataStore.createClient({
+    const draft = {
       name: clientName,
       company_name: clientCompany,
       email: clientEmail,
@@ -133,8 +137,20 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       document: clientDoc,
       address: clientAddress,
       status: clientStatus,
-    });
-    showToast(`Cliente ${c.name} cadastrado com sucesso!`, 'success');
+    };
+    try {
+      clientPhotoLock.current = true;
+      if (clientPhoto) setIsSubmitting(true);
+      const client = clientPhoto ? await dataStore.saveClientPhoto(draft, clientPhoto) : dataStore.createClient(draft);
+      showToast(`Cliente ${client.name} cadastrado com sucesso!`, 'success');
+      setClientPhoto(undefined);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Não foi possível salvar a imagem.', 'error');
+      return;
+    } finally {
+      clientPhotoLock.current = false;
+      setIsSubmitting(false);
+    }
     setClientName('');
     setClientCompany('');
     setClientEmail('');
@@ -293,7 +309,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={() => { if (!clientPhotoLock.current) { setClientPhoto(undefined); onClose(); } }}
       title="Criação Rápida no Sistema"
       subtitle="Cadastre registros conectados instantaneamente"
       maxWidth="lg"
@@ -319,7 +335,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
 
       {/* 1. NOVO CLIENTE */}
       {activeTab === 'client' && (
-        <form onSubmit={guardSubmit(handleCreateClient)} className="space-y-3.5">
+        <form onSubmit={handleCreateClient} className="space-y-3.5">
+          <ClientPhotoField name={clientName} value={clientPhoto} onChange={setClientPhoto} disabled={isSubmitting} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Nome Completo *" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex: João da Silva" />
             <Input label="Empresa / Razão Social *" required value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} placeholder="Ex: Silva & Filhos Ltda" />
@@ -337,7 +354,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
           </div>
           <Input label="Endereço (Opcional)" value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} placeholder="Av. Paulista, 1000 - São Paulo/SP" />
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
+            <Button variant="outline" type="button" disabled={isSubmitting} onClick={() => { setClientPhoto(undefined); onClose(); }}>Cancelar</Button>
             <Button variant="primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Cadastrar Cliente'}</Button>
           </div>
         </form>

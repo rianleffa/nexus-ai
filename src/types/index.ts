@@ -42,6 +42,7 @@ export interface UserProfile extends User {}
 export type ClientStatus = 'ativo' | 'em_negociacao' | 'pendente' | 'inativo';
 
 export interface Client {
+  photo_path?: string | null;
   id: string;
   company_id: string;
   name: string;

@@ -1,3 +1,4 @@
+import { removeClientPhoto, uploadClientPhoto } from './clientPhotos';
 import {
   User,
   Company,
@@ -659,6 +660,39 @@ class DataStore {
     this.persist();
     supabaseSync.syncClient('upsert', this.clients[idx]);
     return this.clients[idx];
+  }
+
+  public async saveClientPhoto(
+    data: Pick<Client, 'name' | 'company_name' | 'email' | 'phone' | 'document' | 'address' | 'notes' | 'status'>,
+    photo: File | null,
+    id?: string,
+  ): Promise<Client> {
+    const companyId = this.company.id;
+    const previous = id ? this.clients.find((client) => client.id === id && client.company_id === companyId) : undefined;
+    if (id && !previous) throw new Error('Cliente não encontrado.');
+    const now = new Date().toISOString();
+    const photoPath = photo ? await uploadClientPhoto(companyId, photo) : null;
+    const saved: Client = {
+      id: previous?.id ?? createRecordId(),
+      company_id: companyId,
+      total_revenue: 0,
+      last_interaction: now,
+      created_at: now,
+      ...previous,
+      ...data,
+      photo_path: photoPath,
+      updated_at: now,
+    };
+    await supabaseSync.syncClient('upsert', saved, { previousPath: previous ? previous.photo_path ?? null : undefined });
+    if (this.company.id === companyId) {
+      this.clients = previous ? this.clients.map((client) => client.id === saved.id ? saved : client) : [saved, ...this.clients];
+      if (!previous) this.addActivity(`${saved.name} foi cadastrado como cliente.`, 'client');
+      this.persist();
+    }
+    if (previous?.photo_path) {
+      void removeClientPhoto(previous.photo_path).catch(() => undefined);
+    }
+    return saved;
   }
 
   public deleteClient(id: string): boolean {

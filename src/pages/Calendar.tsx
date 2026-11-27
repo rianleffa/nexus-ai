@@ -22,7 +22,7 @@ import { dataStore } from '../services/dataStore';
 import { CalendarEvent, CalendarEventType } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
-import { addDaysToLocalDateISO, getLocalDateISO } from '../utils/dates';
+import { addDaysToLocalDateISO, getSaoPauloDateISO } from '../utils/dates';
 
 interface CalendarProps {
   initialEventId?: string;
@@ -38,9 +38,11 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
   const [events, setEvents] = useState<CalendarEvent[]>(() => dataStore.getCalendarEvents());
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'agenda'>('month');
 
+  const todayISO = getSaoPauloDateISO();
+
   // Dynamic Month & Year Navigation
-  const [currentDate, setCurrentDate] = useState(() => initialEvent ? new Date(`${initialEvent.event_date}T12:00:00`) : new Date());
-  const [selectedDay, setSelectedDay] = useState<string>(() => initialEvent?.event_date || getLocalDateISO());
+  const [currentDate, setCurrentDate] = useState(() => new Date(`${initialEvent?.event_date || getSaoPauloDateISO()}T12:00:00`));
+  const [selectedDay, setSelectedDay] = useState<string>(() => initialEvent?.event_date || getSaoPauloDateISO());
   
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(Boolean(initialEvent));
@@ -50,7 +52,7 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
   const [title, setTitle] = useState(initialEvent?.title || '');
   const [clientName, setClientName] = useState(initialEvent?.client_name || '');
   const [clientId, setClientId] = useState(initialEvent?.client_id || '');
-  const [eventDate, setEventDate] = useState(initialEvent?.event_date || addDaysToLocalDateISO(1));
+  const [eventDate, setEventDate] = useState(initialEvent?.event_date || addDaysToLocalDateISO(1, new Date(getSaoPauloDateISO() + "T12:00:00")));
   const [startTime, setStartTime] = useState(initialEvent?.start_time || '14:00');
   const [duration, setDuration] = useState(initialEvent?.duration_minutes || 60);
   const [eventType, setEventType] = useState<CalendarEventType>(initialEvent?.event_type || 'reuniao');
@@ -77,9 +79,8 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
   };
 
   const handleToday = () => {
-    const today = new Date();
-    setCurrentDate(today);
-    const todayStr = getLocalDateISO(today);
+    const todayStr = getSaoPauloDateISO();
+    setCurrentDate(new Date(`${todayStr}T12:00:00`));
     setSelectedDay(todayStr);
     setEventDate(todayStr);
   };
@@ -300,7 +301,7 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
             onClick={handleToday}
             className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-brand-500/10 hover:text-brand-600 dark:hover:text-brand-400 text-slate-700 dark:text-slate-200 transition-colors border border-transparent hover:border-brand-500/20"
           >
-            Hoje (18/09)
+            Hoje
           </button>
           <button
             onClick={handleNextMonth}
@@ -338,7 +339,7 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
 
             {/* Days in Month */}
             {monthGridDays.map((item) => {
-              const isToday = item.dateStr === getLocalDateISO();
+              const isToday = item.dateStr === todayISO;
               const isSelected = item.dateStr === selectedDay;
 
               return (

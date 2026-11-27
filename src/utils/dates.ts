@@ -10,3 +10,15 @@ export const addDaysToLocalDateISO = (days: number, from = new Date()): string =
   date.setDate(date.getDate() + days);
   return getLocalDateISO(date);
 };
+
+const saoPauloDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export const getSaoPauloDateISO = (date = new Date()): string => {
+  const parts = new Map(saoPauloDateFormatter.formatToParts(date).map(({ type, value }) => [type, value]));
+  return [parts.get('year'), parts.get('month'), parts.get('day')].join('-');
+};

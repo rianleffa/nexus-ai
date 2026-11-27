@@ -63,6 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Assistente IA',
       icon: Bot,
     }] : []),
+    { section: 'Administração' },
+    { id: 'settings', label: 'Configurações', icon: Settings },
   ];
 
   const handleNav = (id: string) => {
@@ -125,6 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return (
               <button
                 key={item.id}
+                aria-current={isActive ? 'page' : undefined}
                 onClick={() => handleNav(item.id)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 select-none ${
                   isActive

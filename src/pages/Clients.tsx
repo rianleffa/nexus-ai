@@ -1,3 +1,4 @@
+import { UserAvatar } from '../components/common/UserAvatar';
 import { formatStatus } from '../utils/status';
 import { formatDateBR, formatTimeBR } from '../utils/dates';
 import React, { useState, useEffect } from 'react';
@@ -46,6 +47,7 @@ export const Clients: React.FC<ClientsProps> = ({
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'recent'>('name');
   const [statusFilter, setStatusFilter] = useState<'all' | ClientStatus>(initialFilter || 'all');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -118,14 +120,18 @@ export const Clients: React.FC<ClientsProps> = ({
     return unsub;
   }, [initialClientId]);
 
-  const filteredClients = clients.filter((c) => {
-    const matchesSearch =
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const query = searchQuery.trim().toLocaleLowerCase('pt-BR');
+  const queryDigits = /^[\d\s()+./-]+$/.test(query) ? query.replace(/\D/g, '') : '';
+  const filteredClients = clients.filter((client) => {
+    const matchesText = [client.name, client.company_name, client.email]
+      .some((value) => value?.toLocaleLowerCase('pt-BR').includes(query));
+    const matchesDigits = Boolean(queryDigits) && [client.document, client.phone]
+      .some((value) => value?.replace(/\D/g, '').includes(queryDigits));
+    return (matchesText || matchesDigits)
+      && (statusFilter === 'all' || client.status === statusFilter);
+  }).sort((first, second) => sortBy === 'name'
+    ? first.name.localeCompare(second.name, 'pt-BR') || first.id.localeCompare(second.id)
+    : second.created_at.localeCompare(first.created_at) || first.id.localeCompare(second.id));
 
   const activeCount = clients.filter((c) => c.status === 'ativo').length;
   const negotiationCount = clients.filter((c) => c.status === 'em_negociacao').length;
@@ -133,6 +139,17 @@ export const Clients: React.FC<ClientsProps> = ({
   const inactiveCount = clients.filter((c) => c.status === 'inativo').length;
 
   const handleDelete = (id: string, clientName: string) => {
+    const hasLinkedRecords = [
+      ...dataStore.getProjects(),
+      ...dataStore.getTasks(),
+      ...dataStore.getCalendarEvents(),
+      ...dataStore.getDocuments(),
+      ...dataStore.getClientFinancialSummary(id).transactions,
+    ].some((record) => record.client_id === id || (!record.client_id && record.client_name === clientName));
+    if (hasLinkedRecords) {
+      showToast('Este cliente possui registros vinculados. Altere o status para Inativo para preservar o histórico.', 'warning');
+      return;
+    }
     if (confirm(`Tem certeza que deseja excluir o cliente ${clientName}?`)) {
       dataStore.deleteClient(id);
       showToast(`Cliente ${clientName} excluído.`, 'info');
@@ -142,15 +159,15 @@ export const Clients: React.FC<ClientsProps> = ({
 
   // Detailed client relations (360 View)
   const clientProjects = selectedClient
-    ? dataStore.getProjects().filter((p) => p.client_id === selectedClient.id || p.client_name === selectedClient.name)
+    ? dataStore.getProjects().filter((p) => p.client_id === selectedClient.id || (!p.client_id && p.client_name === selectedClient.name))
     : [];
 
   const clientTasks = selectedClient
-    ? dataStore.getTasks().filter((t) => t.client_id === selectedClient.id || t.client_name === selectedClient.name)
+    ? dataStore.getTasks().filter((t) => t.client_id === selectedClient.id || (!t.client_id && t.client_name === selectedClient.name))
     : [];
 
   const clientEvents = selectedClient
-    ? dataStore.getCalendarEvents().filter((e) => e.client_id === selectedClient.id || e.client_name === selectedClient.name)
+    ? dataStore.getCalendarEvents().filter((e) => e.client_id === selectedClient.id || (!e.client_id && e.client_name === selectedClient.name))
     : [];
 
   const clientFinancial = selectedClient
@@ -158,7 +175,7 @@ export const Clients: React.FC<ClientsProps> = ({
     : { totalContracted: 0, totalReceived: 0, totalPending: 0, transactions: [] };
 
   const clientDocuments = selectedClient
-    ? dataStore.getDocuments().filter((d) => d.client_id === selectedClient.id || d.client_name === selectedClient.name)
+    ? dataStore.getDocuments().filter((d) => d.client_id === selectedClient.id || (!d.client_id && d.client_name === selectedClient.name))
     : [];
 
   return (
@@ -182,9 +199,7 @@ export const Clients: React.FC<ClientsProps> = ({
           <Card className="p-6 space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-brand-500 flex items-center justify-center text-white text-2xl font-bold shadow-card shrink-0">
-                  {selectedClient.name.charAt(0)}
-                </div>
+                <UserAvatar name={selectedClient.name} size="xl" />
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -466,7 +481,7 @@ export const Clients: React.FC<ClientsProps> = ({
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Buscar por nome, empresa ou e-mail..."
+                placeholder="Buscar por nome, empresa, CPF/CNPJ, telefone ou e-mail"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -530,6 +545,15 @@ export const Clients: React.FC<ClientsProps> = ({
           {/* Table */}
           <Card className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
+              <div className="flex justify-end px-5 py-3">
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                  Ordenar por
+                  <select value={sortBy} onChange={(event) => setSortBy(event.target.value === 'recent' ? 'recent' : 'name')} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900">
+                    <option value="name">Nome</option>
+                    <option value="recent">Cadastro mais recente</option>
+                  </select>
+                </label>
+              </div>
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
                   <tr>
@@ -550,7 +574,10 @@ export const Clients: React.FC<ClientsProps> = ({
                       className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer transition-colors group"
                     >
                       <td className="px-5 py-3.5 font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-500">
-                        {client.name}
+                        <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedClient(client); }} className="flex items-center gap-2 text-left">
+                          <UserAvatar name={client.name} size="sm" />
+                          <span>{client.name}</span>
+                        </button>
                       </td>
                       <td className="px-5 py-3.5 text-slate-600 dark:text-slate-300">
                         {client.company_name}
@@ -571,7 +598,8 @@ export const Clients: React.FC<ClientsProps> = ({
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setSelectedClient(client)}
-                            title="Ver visão 360"
+                            title="Abrir perfil"
+                            aria-label={"Abrir perfil de " + client.name}
                             className="p-1.5 text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -579,6 +607,7 @@ export const Clients: React.FC<ClientsProps> = ({
                           <button
                             onClick={() => handleDelete(client.id, client.name)}
                             title="Excluir"
+                            aria-label={"Excluir " + client.name}
                             className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

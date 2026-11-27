@@ -95,7 +95,7 @@ class SupabaseSyncService {
   /**
    * Busca todos os registros do tenant no Supabase
    */
-  public async fetchRemoteData(companyId?: string): Promise<RemoteSyncData | null> {
+  public async fetchRemoteData(companyId?: string, signal?: AbortSignal): Promise<RemoteSyncData | null> {
     if (!isSupabaseConfigured || !supabase || !companyId) {
       return null;
     }
@@ -104,7 +104,8 @@ class SupabaseSyncService {
       this.setStatus('syncing');
 
       const companyQuery = (table: string) => {
-        return supabase!.from(table).select('*').eq('company_id', companyId);
+        const query = supabase!.from(table).select('*').eq('company_id', companyId);
+        return signal ? query.abortSignal(signal) : query;
       };
 
       // Fetch in parallel for high speed
@@ -337,7 +338,7 @@ class SupabaseSyncService {
   // --------------------------------------------------------------------------
 
   // Clientes
-  public async syncClient(action: 'upsert' | 'delete', client: Partial<Client> & { id: string }, photoChange?: { previousPath?: string | null }) {
+  public async syncClient(action: 'upsert' | 'delete', client: Partial<Client> & { id: string }, photoChange?: { previousPath?: string | null }, confirmedWrite?: "create" | "edit") {
     if (!isSupabaseConfigured || !supabase) {
       if (photoChange) throw new Error('O banco de dados em nuvem não está disponível.');
       return;
@@ -385,6 +386,14 @@ class SupabaseSyncService {
                 .filter('photo_path', photoChange.previousPath === null ? 'is' : 'eq', photoChange.previousPath);
           const { error } = await pending.select('id').single();
           if (error) throw error;
+        } else if (confirmedWrite) {
+          const query = supabase.from('clients');
+          const { id, company_id, user_id: _owner, total_revenue: _revenue, last_interaction: _interaction, ...details } = payload;
+          const mutation = confirmedWrite === 'create'
+            ? query.insert(payload)
+            : query.update(details).eq('id', id).eq('company_id', company_id!);
+          const { error } = await mutation.select('id').single();
+          if (error) throw error;
         } else {
           const { error } = await supabase.from('clients').upsert(payload);
           if (error) throw error;
@@ -393,7 +402,7 @@ class SupabaseSyncService {
       this.setStatus('connected');
     } catch (err) {
       this.setStatus('error');
-      if (photoChange) throw new Error('Não foi possível confirmar a gravação do cliente. Atualize a lista antes de tentar novamente.');
+      if (photoChange || confirmedWrite) throw new Error('Não foi possível confirmar a gravação do cliente. Atualize a lista antes de tentar novamente.');
       console.warn('[SupabaseSync] Erro ao sincronizar cliente:', err);
     }
   }

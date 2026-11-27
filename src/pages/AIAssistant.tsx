@@ -1,3 +1,5 @@
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { formatTimeBR } from '../utils/dates';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -116,7 +118,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
     try {
       const response = await AIService.processMessage(textToSend, [...messages, userMsg], initialContextPage);
       if (response.feedback === 'success' && company?.id) {
-        const remoteData = await supabaseSync.fetchRemoteData(company.id);
+        const remoteData = await supabaseSync.fetchRemoteData(company.id, AbortSignal.timeout(8_000));
         if (remoteData) dataStore.syncFromRemote(remoteData);
         else showToast('A ação foi concluída, mas a atualização dos módulos está atrasada.', 'warning');
       }
@@ -130,13 +132,13 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         });
         showToast('Tudo certo!', 'success');
       }
-    } catch {
+    } catch (error) {
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           sender: 'assistant',
-          content: 'Não foi possível concluir a operação. Tente novamente.',
+          content: error instanceof Error ? error.message : 'Não foi possível concluir a operação. Tente novamente.',
           feedback: 'error',
           timestamp: formatTimeBR(new Date()),
         },
@@ -164,7 +166,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
 
       showToast('Operação concluída.', 'success');
       try {
-        const remoteData = await supabaseSync.fetchRemoteData(company?.id);
+        const remoteData = await supabaseSync.fetchRemoteData(company?.id, AbortSignal.timeout(8_000));
         if (remoteData) dataStore.syncFromRemote(remoteData);
       } catch {
         showToast('A ação foi gravada. Atualize a página para recarregar os dados.', 'warning');
@@ -332,7 +334,13 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
               <div className="whitespace-pre-line text-xs font-normal leading-relaxed">
                 {msg.feedback === 'success' && <CheckCircle2 aria-label="Concluído" className="inline w-3.5 h-3.5 mr-1.5 text-emerald-500 align-[-2px]" />}
                 {msg.feedback === 'error' && <AlertTriangle aria-label="Erro" className="inline w-3.5 h-3.5 mr-1.5 text-rose-500 align-[-2px]" />}
-                {msg.content}
+                {msg.sender === 'assistant' ? (
+                  <div className="min-w-0 break-words whitespace-normal [&_p+p]:mt-2 [&_h1]:mt-3 [&_h1]:text-base [&_h2]:mt-3 [&_h2]:text-sm [&_h3]:mt-2 [&_h1]:font-bold [&_h2]:font-bold [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_a]:underline [&_pre]:overflow-x-auto">
+                    <Markdown skipHtml disallowedElements={['img']} remarkPlugins={[remarkGfm]} components={{
+                      table: ({ children }) => <div className="my-2 max-w-full overflow-x-auto"><table className="w-full border-collapse text-left [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2">{children}</table></div>,
+                    }}>{msg.content}</Markdown>
+                  </div>
+                ) : msg.content}
               </div>
 
               {/* Sensitive Action Confirmation Card */}

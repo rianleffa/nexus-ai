@@ -25,7 +25,7 @@ import {
   FinancialTransaction,
 } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
-import { getLocalDateISO } from '../utils/dates';
+import { formatDateBR, getLocalDateISO, getSaoPauloDateISO } from '../utils/dates';
 import { supabaseSync } from '../services/supabaseSync';
 import { Client, TransactionCategory, TransactionStatus } from '../types';
 
@@ -43,7 +43,7 @@ interface TransactionForm {
 
 const transactionCategories: TransactionCategory[] = ['Vendas', 'Serviços', 'Salários', 'Marketing', 'Operacional', 'Impostos', 'Outros'];
 const emptyTransactionForm: TransactionForm = {
-  description: '', amount: '', category: 'Outros', client_id: '', project_id: '', due_date: getLocalDateISO(), payment_date: '', payment_method: 'pix', status: 'pendente',
+  description: '', amount: '', category: 'Outros', client_id: '', project_id: '', due_date: getSaoPauloDateISO(), payment_date: '', payment_method: 'pix', status: 'pendente',
 };
 
 interface FinancialProps {
@@ -157,7 +157,7 @@ export const Financial: React.FC<FinancialProps> = ({
       const paid = transaction.status !== 'pago';
       const updates: Partial<FinancialTransaction> = {
         status: paid ? 'pago' : 'pendente',
-        payment_date: paid ? getLocalDateISO() : undefined,
+        payment_date: paid ? getSaoPauloDateISO() : undefined,
       };
       const saved = await supabaseSync.syncFinancialTransaction('upsert', { ...transaction, ...updates });
       if (!saved) {
@@ -172,8 +172,8 @@ export const Financial: React.FC<FinancialProps> = ({
   };
 
   // Cash received and paid during the current month.
-  const today = getLocalDateISO();
-  const now = new Date();
+  const today = getSaoPauloDateISO();
+  const now = new Date(today + 'T12:00:00');
   const monthStart = getLocalDateISO(new Date(now.getFullYear(), now.getMonth(), 1));
   const monthEnd = getLocalDateISO(new Date(now.getFullYear(), now.getMonth() + 1, 0));
   const paidThisMonth = transactions.filter((transaction) => {
@@ -396,7 +396,7 @@ export const Financial: React.FC<FinancialProps> = ({
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-slate-400 text-[11px]">
-                      {tx.due_date}
+                      {formatDateBR(tx.due_date)}
                     </td>
                     <td className="px-5 py-3.5 text-slate-400 text-[11px]">
                       {tx.status === 'pago' ? tx.payment_date || tx.due_date : '—'}

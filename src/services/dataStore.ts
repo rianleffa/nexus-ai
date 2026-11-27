@@ -1,3 +1,5 @@
+import { calculateProjectProgress } from '../utils/projectProgress';
+import { digitsOnly } from '../utils/clientContact';
 import { removeClientPhoto, uploadClientPhoto } from './clientPhotos';
 import {
   User,
@@ -618,6 +620,13 @@ class DataStore {
   // ----------------------------------------------------------------------------
   // Clients
   // ----------------------------------------------------------------------------
+  public hasClientDocument(document?: string | null, ignoreId?: string): boolean {
+    const digits = digitsOnly(document);
+    return Boolean(digits) && this.clients.some((client) =>
+      client.company_id === this.company.id && client.id !== ignoreId && digitsOnly(client.document) === digits,
+    );
+  }
+
   public getClients(): Client[] {
     return [...this.clients];
   }
@@ -633,7 +642,7 @@ class DataStore {
     );
   }
 
-  public createClient(data: Omit<Client, 'id' | 'company_id' | 'created_at' | 'total_revenue' | 'last_interaction'>): Client {
+  public async createClient(data: Omit<Client, 'id' | 'company_id' | 'created_at' | 'total_revenue' | 'last_interaction'>): Promise<Client> {
     const newClient: Client = {
       id: createRecordId(),
       company_id: this.company.id,
@@ -642,24 +651,24 @@ class DataStore {
       last_interaction: new Date().toISOString(),
       created_at: new Date().toISOString(),
     };
+    await supabaseSync.syncClient('upsert', newClient, undefined, 'create');
+    if (this.company.id !== newClient.company_id) return newClient;
     this.clients.unshift(newClient);
     this.addActivity(`${newClient.name} foi cadastrado como cliente.`, 'client');
     this.persist();
-    supabaseSync.syncClient('upsert', newClient);
     return newClient;
   }
 
-  public updateClient(id: string, updates: Partial<Client>): Client | null {
-    const idx = this.clients.findIndex((c) => c.id === id);
-    if (idx === -1) return null;
-    this.clients[idx] = {
-      ...this.clients[idx],
-      ...updates,
-      updated_at: new Date().toISOString(),
-    };
-    this.persist();
-    supabaseSync.syncClient('upsert', this.clients[idx]);
-    return this.clients[idx];
+  public async updateClient(id: string, updates: Partial<Client>): Promise<Client | null> {
+    const current = this.clients.find((client) => client.id === id);
+    if (!current) return null;
+    const saved = { ...current, ...updates, updated_at: new Date().toISOString() };
+    await supabaseSync.syncClient('upsert', saved, undefined, 'edit');
+    if (this.company.id === saved.company_id) {
+      this.clients = this.clients.map((client) => client.id === id ? saved : client);
+      this.persist();
+    }
+    return saved;
   }
 
   public async saveClientPhoto(
@@ -710,18 +719,8 @@ class DataStore {
   // Projects
   // ----------------------------------------------------------------------------
   public getProjects(): Project[] {
-    const counts = new Map<string, { completed: number; total: number }>();
-    for (const task of this.tasks) {
-      if (!task.project_id || task.company_id !== this.company.id) continue;
-      const count = counts.get(task.project_id) ?? { completed: 0, total: 0 };
-      count.total += 1;
-      if (task.status === 'concluido') count.completed += 1;
-      counts.set(task.project_id, count);
-    }
-    return this.projects.map((project) => {
-      const count = counts.get(project.id);
-      return { ...project, progress: count ? Math.round(count.completed * 100 / count.total) : 0 };
-    });
+    const progress = calculateProjectProgress(this.tasks, this.company.id);
+    return this.projects.map((project) => ({ ...project, progress: progress.get(project.id) ?? 0 }));
   }
 
   public getProject(id: string): Project | undefined {

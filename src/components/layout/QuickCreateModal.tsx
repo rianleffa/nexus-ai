@@ -1,3 +1,5 @@
+import { clientPhotosEnabled } from '../../services/clientPhotos';
+import { maskDocument, maskPhone, validateClientContact, type PersonType } from '../../utils/clientContact';
 import { ClientPhotoField } from '../common/ClientPhoto';
 import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../ui/Modal';
@@ -41,6 +43,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const clientPhotoLock = useRef(false);
+  const [clientType, setClientType] = useState<PersonType>('individual');
   const [clientPhoto, setClientPhoto] = useState<File | null>();
   const { showToast } = useNotification();
   const { user } = useAuth();
@@ -129,10 +132,15 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       showToast('Preencha nome, empresa e e-mail do cliente.', 'warning');
       return;
     }
+    const validation = validateClientContact(clientDoc, clientPhone, clientType);
+    if (validation || dataStore.hasClientDocument(clientDoc)) {
+      showToast(validation || 'Já existe um cliente com este CPF ou CNPJ.', 'warning');
+      return;
+    }
     const draft = {
-      name: clientName,
-      company_name: clientCompany,
-      email: clientEmail,
+      name: clientName.trim(),
+      company_name: clientCompany.trim(),
+      email: clientEmail.trim(),
       phone: clientPhone,
       document: clientDoc,
       address: clientAddress,
@@ -140,8 +148,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     };
     try {
       clientPhotoLock.current = true;
-      if (clientPhoto) setIsSubmitting(true);
-      const client = clientPhoto ? await dataStore.saveClientPhoto(draft, clientPhoto) : dataStore.createClient(draft);
+      setIsSubmitting(true);
+      const client = clientPhotosEnabled && clientPhoto ? await dataStore.saveClientPhoto(draft, clientPhoto) : await dataStore.createClient(draft);
       showToast(`Cliente ${client.name} cadastrado com sucesso!`, 'success');
       setClientPhoto(undefined);
     } catch (error) {
@@ -155,6 +163,9 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     setClientCompany('');
     setClientEmail('');
     setClientPhone('');
+    setClientDoc('');
+    setClientAddress('');
+    setClientType('individual');
     onClose();
   };
 
@@ -336,17 +347,25 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
       {/* 1. NOVO CLIENTE */}
       {activeTab === 'client' && (
         <form onSubmit={handleCreateClient} className="space-y-3.5">
-          <ClientPhotoField name={clientName} value={clientPhoto} onChange={setClientPhoto} disabled={isSubmitting} />
+          {clientPhotosEnabled && <ClientPhotoField name={clientName} value={clientPhoto} onChange={setClientPhoto} disabled={isSubmitting} />}
+          <label className="block text-xs font-medium">
+            Tipo de pessoa
+            <select className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-900" value={clientType}
+              onChange={(event) => { const type = event.target.value as PersonType; setClientType(type); setClientDoc(maskDocument(clientDoc, type)); }}>
+              <option value="individual">Pessoa física</option>
+              <option value="company">Pessoa jurídica</option>
+            </select>
+          </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Nome Completo *" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex: João da Silva" />
             <Input label="Empresa / Razão Social *" required value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} placeholder="Ex: Silva & Filhos Ltda" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="E-mail *" type="email" required value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="contato@empresa.com" />
-            <Input label="Telefone / WhatsApp" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="(11) 98765-4321" />
+            <Input label="Telefone / WhatsApp" value={clientPhone} onChange={(e) => setClientPhone(maskPhone(e.target.value))} placeholder="(11) 98765-4321" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="CPF ou CNPJ" value={clientDoc} onChange={(e) => setClientDoc(e.target.value)} placeholder="Informe o CPF ou CNPJ" />
+            <Input label={clientType === "company" ? "CNPJ" : "CPF"} value={clientDoc} onChange={(e) => setClientDoc(maskDocument(e.target.value, clientType))} placeholder="Informe o CPF ou CNPJ" />
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Status Inicial</label>
               <ClientStatusSelect value={clientStatus} onChange={setClientStatus} />

@@ -22,7 +22,7 @@ import { dataStore } from '../services/dataStore';
 import { CalendarEvent, CalendarEventType } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
-import { addDaysToLocalDateISO, getSaoPauloDateISO } from '../utils/dates';
+import { addDaysToLocalDateISO, formatDateBR, formatTimeBR, getSaoPauloDateISO } from '../utils/dates';
 
 interface CalendarProps {
   initialEventId?: string;
@@ -384,9 +384,9 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
                         className={`text-[10px] px-1.5 py-0.5 rounded-lg truncate border font-medium cursor-pointer hover:opacity-80 transition-opacity ${getEventBadgeColor(
                           ev.event_type
                         )} ${ev.status === 'concluido' ? 'opacity-50 line-through' : ''}`}
-                        title={`${ev.start_time} - ${ev.title} (${ev.client_name || 'Sem cliente'})`}
+                        title={`${formatTimeBR(ev.start_time)} - ${ev.title} (${ev.client_name || 'Sem cliente'})`}
                       >
-                        {ev.start_time} {ev.title}
+                        {formatTimeBR(ev.start_time)} {ev.title}
                       </div>
                     ))}
                     {item.events.length > 2 && (
@@ -422,10 +422,10 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
                   <div className="flex items-start sm:items-center gap-4">
                     <div className="text-center px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 min-w-[70px]">
                       <span className="block text-sm font-bold text-slate-900 dark:text-white">
-                        {evt.start_time}
+                        {formatTimeBR(evt.start_time)}
                       </span>
                       <span className="block text-[10px] text-slate-400 uppercase">
-                        {evt.event_date}
+                        {formatDateBR(evt.event_date)}
                       </span>
                     </div>
 
@@ -526,7 +526,7 @@ export const Calendar: React.FC<CalendarProps> = ({ initialEventId, onNavigate }
               <span>
                 <strong>Atenção:</strong> Há sobreposição de horário com "
                 {currentConflict.conflictingEvent?.title}" (
-                {currentConflict.conflictingEvent?.start_time}).
+                {formatTimeBR(currentConflict.conflictingEvent?.start_time)}).
               </span>
             </div>
           )}

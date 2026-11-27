@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { dataStore } from '../services/dataStore';
 import { CalendarEvent, Task } from '../types';
 import { getLocalDateISO } from '../utils/dates';
+import { formatDateBR, formatTimeBR, getSaoPauloDateISO } from '../utils/dates';
 import { useQuickCreate } from '../components/layout/QuickCreateContext';
 
 type PeriodFilter = '7d' | '30d' | 'month';
@@ -28,7 +29,7 @@ interface DashboardProps {
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatBRL = (value: number) => currency.format(value);
-const formatDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
+const formatDate = formatDateBR;
 
 const getPeriodRange = (period: PeriodFilter, now: Date) => {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -79,7 +80,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [, setTick] = useState(0);
   const [period, setPeriod] = useState<PeriodFilter>('month');
   const now = new Date();
-  const today = getLocalDateISO(now);
+  const today = getSaoPauloDateISO(now);
   const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   weekEnd.setDate(weekEnd.getDate() + 7);
   const weekEndISO = getLocalDateISO(weekEnd);
@@ -218,7 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                         <span className="block truncate text-sm font-medium text-slate-800 dark:text-slate-200">{event.title}</span>
                         <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{event.client_name ? `${event.client_name} · ` : ''}{event.event_date === today ? 'Hoje' : formatDate(event.event_date)}</span>
                       </span>
-                      <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{event.start_time}</span>
+                      <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{formatTimeBR(event.start_time)}</span>
                     </button>
                   </li>
                 ))}

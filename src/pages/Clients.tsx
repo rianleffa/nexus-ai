@@ -1,3 +1,5 @@
+import { clientPhotosEnabled } from '../services/clientPhotos';
+import { clientWhatsAppUrl, getPersonType, maskDocument, maskPhone, validateClientContact, type PersonType } from '../utils/clientContact';
 import { ClientPhoto, ClientPhotoField } from '../components/common/ClientPhoto';
 import { formatStatus } from '../utils/status';
 import { formatDateBR, formatTimeBR } from '../utils/dates';
@@ -51,6 +53,8 @@ export const Clients: React.FC<ClientsProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | ClientStatus>(initialFilter || 'all');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [personType, setPersonType] = useState<PersonType>("individual");
+  const [personFilter, setPersonFilter] = useState<PersonType | "all" | "unknown">("all");
   const [photo, setPhoto] = useState<File | null>();
   const [savingPhoto, setSavingPhoto] = useState(false);
   const photoLock = useRef(false);
@@ -69,6 +73,7 @@ export const Clients: React.FC<ClientsProps> = ({
   const openClientEditor = (client: Client) => {
     setSelectedClient(client);
     setPhoto(undefined);
+    setPersonType(getPersonType(client.document) ?? 'individual');
     setClientDraft({
       name: client.name,
       company_name: client.company_name,
@@ -90,6 +95,13 @@ export const Clients: React.FC<ClientsProps> = ({
       return;
     }
 
+    const documentChanged = clientDraft.document.trim() !== (selectedClient.document || '').trim();
+    const phoneChanged = clientDraft.phone.trim() !== (selectedClient.phone || '').trim();
+    const validation = validateClientContact(documentChanged ? clientDraft.document : '', phoneChanged ? clientDraft.phone : '', personType);
+    if (validation || (documentChanged && dataStore.hasClientDocument(clientDraft.document, selectedClient.id))) {
+      showToast(validation || 'Já existe outro cliente com este CPF ou CNPJ.', 'warning');
+      return;
+    }
     const draft = {
       ...clientDraft,
       name: clientDraft.name.trim(),
@@ -105,8 +117,8 @@ export const Clients: React.FC<ClientsProps> = ({
     try {
       photoLock.current = true;
       setSavingPhoto(true);
-      updated = photo === undefined
-        ? dataStore.updateClient(selectedClient.id, draft)
+      updated = !clientPhotosEnabled || photo === undefined
+        ? await dataStore.updateClient(selectedClient.id, draft)
         : await dataStore.saveClientPhoto(draft, photo, selectedClient.id);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Não foi possível salvar a imagem.', 'error');
@@ -148,7 +160,8 @@ export const Clients: React.FC<ClientsProps> = ({
     const matchesDigits = Boolean(queryDigits) && [client.document, client.phone]
       .some((value) => value?.replace(/\D/g, '').includes(queryDigits));
     return (matchesText || matchesDigits)
-      && (statusFilter === 'all' || client.status === statusFilter);
+      && (statusFilter === 'all' || client.status === statusFilter)
+      && (personFilter === 'all' || (getPersonType(client.document) ?? 'unknown') === personFilter);
   }).sort((first, second) => sortBy === 'name'
     ? first.name.localeCompare(second.name, 'pt-BR') || first.id.localeCompare(second.id)
     : second.created_at.localeCompare(first.created_at) || first.id.localeCompare(second.id));
@@ -176,6 +189,8 @@ export const Clients: React.FC<ClientsProps> = ({
       if (selectedClient?.id === id) setSelectedClient(null);
     }
   };
+
+  const whatsapp = clientWhatsAppUrl(selectedClient?.phone);
 
   // Detailed client relations (360 View)
   const clientProjects = selectedClient
@@ -219,13 +234,14 @@ export const Clients: React.FC<ClientsProps> = ({
           <Card className="p-6 space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-4">
-                <ClientPhoto name={selectedClient.name} path={selectedClient.photo_path} size="xl" />
+                <ClientPhoto name={selectedClient.name} path={clientPhotosEnabled ? selectedClient.photo_path : undefined} size="xl" />
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                       {selectedClient.name}
                     </h2>
                     <ClientStatusBadge status={selectedClient.status} />
+                    {whatsapp && <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">WhatsApp</a>}
                     <Button variant="outline" size="sm" onClick={() => openClientEditor(selectedClient)}>
                       <Edit2 className="w-3.5 h-3.5" />
                       Editar
@@ -238,9 +254,9 @@ export const Clients: React.FC<ClientsProps> = ({
               </div>
 
               {/* 3 Financial KPIs */}
-              <div className="grid grid-cols-3 gap-3 text-xs w-full lg:w-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs w-full lg:w-auto">
                 <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 text-center sm:text-left">
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
+                  <span className="text-slate-600 dark:text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
                     Total Contratado
                   </span>
                   <span className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5 block">
@@ -271,19 +287,19 @@ export const Clients: React.FC<ClientsProps> = ({
             {/* Contact Info Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
               <div className="space-y-1">
-                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-medium">
                   <Mail className="w-3.5 h-3.5" /> E-mail Profissional
                 </span>
                 <p className="text-slate-800 dark:text-slate-200 font-semibold">{selectedClient.email}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-medium">
                   <Phone className="w-3.5 h-3.5" /> Telefone / WhatsApp
                 </span>
                 <p className="text-slate-800 dark:text-slate-200 font-semibold">{selectedClient.phone}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-medium">
                   <Building className="w-3.5 h-3.5" /> Endereço Comercial
                 </span>
                 <p className="text-slate-800 dark:text-slate-200">{selectedClient.address || 'Não cadastrado'}</p>
@@ -309,7 +325,7 @@ export const Clients: React.FC<ClientsProps> = ({
                 </h3>
               </div>
               {clientProjects.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Nenhuma projeto vinculada a este cliente.</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 py-4 text-center">Nenhuma projeto vinculada a este cliente.</p>
               ) : (
                 <div className="space-y-2.5">
                   {clientProjects.map((p) => (
@@ -318,7 +334,7 @@ export const Clients: React.FC<ClientsProps> = ({
                         <span className="font-bold text-slate-900 dark:text-white">{p.name}</span>
                         <ProjectStatusBadge status={p.status} />
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
                         <span>Orçamento: R$ {p.budget.toLocaleString('pt-BR')}</span>
                         <span>Prazo: {formatDateBR(p.due_date)}</span>
                       </div>
@@ -340,14 +356,14 @@ export const Clients: React.FC<ClientsProps> = ({
                 </h3>
               </div>
               {clientTasks.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Nenhuma tarefa vinculada.</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 py-4 text-center">Nenhuma tarefa vinculada.</p>
               ) : (
                 <div className="space-y-2">
                   {clientTasks.map((t) => (
                     <div key={t.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{t.title}</p>
-                        <span className="text-[11px] text-slate-400">Prazo: {formatDateBR(t.due_date)}</span>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400">Prazo: {formatDateBR(t.due_date)}</span>
                       </div>
                       <Badge variant={t.status === 'concluido' ? 'success' : 'warning'}>{formatStatus(t.status)}</Badge>
                     </div>
@@ -365,14 +381,14 @@ export const Clients: React.FC<ClientsProps> = ({
                 </h3>
               </div>
               {clientEvents.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Nenhum compromisso agendado.</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 py-4 text-center">Nenhum compromisso agendado.</p>
               ) : (
                 <div className="space-y-2">
                   {clientEvents.map((e) => (
                     <div key={e.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{e.title}</p>
-                        <span className="text-[11px] text-slate-400">{formatDateBR(e.event_date)} às {formatTimeBR(e.start_time)} • {e.location}</span>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400">{formatDateBR(e.event_date)} às {formatTimeBR(e.start_time)} • {e.location}</span>
                       </div>
                       <Badge variant="info">{formatStatus(e.status)}</Badge>
                     </div>
@@ -390,14 +406,14 @@ export const Clients: React.FC<ClientsProps> = ({
                 </h3>
               </div>
               {clientFinancial.transactions.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Nenhum lançamento vinculado.</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 py-4 text-center">Nenhum lançamento vinculado.</p>
               ) : (
                 <div className="space-y-2">
                   {clientFinancial.transactions.map((tx) => (
                     <div key={tx.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">{tx.description}</p>
-                        <span className="text-[11px] text-slate-400">{formatDateBR(tx.due_date)} • {tx.category} • {formatStatus(tx.status)}</span>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400">{formatDateBR(tx.due_date)} • {tx.category} • {formatStatus(tx.status)}</span>
                       </div>
                       <span className={`font-bold ${tx.status === 'pago' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                         R$ {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -417,14 +433,14 @@ export const Clients: React.FC<ClientsProps> = ({
                 </h3>
               </div>
               {clientDocuments.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Nenhum documento anexado.</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 py-4 text-center">Nenhum documento anexado.</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {clientDocuments.map((doc) => (
                     <div key={doc.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
                       <div className="truncate">
                         <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">{doc.title}</p>
-                        <span className="text-[11px] text-slate-400">{doc.category} • {doc.file_size}</span>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400">{doc.category} • {doc.file_size}</span>
                       </div>
                       <Button variant="ghost" size="sm" disabled={!onNavigate} onClick={() => onNavigate?.('documents')}>
                         Abrir documentos
@@ -454,7 +470,7 @@ export const Clients: React.FC<ClientsProps> = ({
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3.5">
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider block">
                 Total de Clientes
               </span>
               <span className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1 block">
@@ -486,7 +502,7 @@ export const Clients: React.FC<ClientsProps> = ({
               </span>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider block">
                 Sem Atividade
               </span>
               <span className="text-2xl font-extrabold text-slate-700 dark:text-slate-300 mt-1 block">
@@ -498,13 +514,13 @@ export const Clients: React.FC<ClientsProps> = ({
           {/* Filters & Search */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-600 dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Buscar por nome, empresa, CPF/CNPJ, telefone ou e-mail"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-600 dark:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
 
@@ -565,7 +581,17 @@ export const Clients: React.FC<ClientsProps> = ({
           {/* Table */}
           <Card className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
-              <div className="flex justify-end px-5 py-3">
+              <div className="flex flex-wrap justify-end gap-3 px-5 py-3">
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                  Tipo
+                  <select className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900" value={personFilter}
+                    onChange={(event) => setPersonFilter(event.target.value as typeof personFilter)}>
+                    <option value="all">Todos</option>
+                    <option value="individual">Pessoa física</option>
+                    <option value="company">Pessoa jurídica</option>
+                    <option value="unknown">Sem documento completo</option>
+                  </select>
+                </label>
                 <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
                   Ordenar por
                   <select value={sortBy} onChange={(event) => setSortBy(event.target.value === 'recent' ? 'recent' : 'name')} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900">
@@ -574,7 +600,7 @@ export const Clients: React.FC<ClientsProps> = ({
                   </select>
                 </label>
               </div>
-              <table className="w-full text-left text-xs">
+              <table className="w-full min-w-[680px] text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="px-5 py-3.5">Nome / Contato</th>
@@ -595,7 +621,7 @@ export const Clients: React.FC<ClientsProps> = ({
                     >
                       <td className="px-5 py-3.5 font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-500">
                         <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedClient(client); }} className="flex items-center gap-2 text-left">
-                          <ClientPhoto name={client.name} path={client.photo_path} size="sm" />
+                          <ClientPhoto name={client.name} path={clientPhotosEnabled ? client.photo_path : undefined} size="sm" />
                           <span>{client.name}</span>
                         </button>
                       </td>
@@ -608,7 +634,7 @@ export const Clients: React.FC<ClientsProps> = ({
                       <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
                         {client.phone}
                       </td>
-                      <td className="px-5 py-3.5 text-slate-400 text-[11px]">
+                      <td className="px-5 py-3.5 text-slate-600 dark:text-slate-400 text-[11px]">
                         {formatDateBR(client.last_interaction)}
                       </td>
                       <td className="px-5 py-3.5">
@@ -620,7 +646,7 @@ export const Clients: React.FC<ClientsProps> = ({
                             onClick={() => setSelectedClient(client)}
                             title="Abrir perfil"
                             aria-label={"Abrir perfil de " + client.name}
-                            className="p-1.5 text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </button>
@@ -628,7 +654,7 @@ export const Clients: React.FC<ClientsProps> = ({
                             onClick={() => handleDelete(client.id, client.name)}
                             title="Excluir"
                             aria-label={"Excluir " + client.name}
-                            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -651,13 +677,20 @@ export const Clients: React.FC<ClientsProps> = ({
         maxWidth="2xl"
       >
         <form onSubmit={handleUpdateClient} className="space-y-4">
-          {isEditModalOpen && <ClientPhotoField name={clientDraft.name} path={selectedClient?.photo_path} value={photo} onChange={setPhoto} disabled={savingPhoto} />}
+          {clientPhotosEnabled && isEditModalOpen && <ClientPhotoField name={clientDraft.name} path={selectedClient?.photo_path} value={photo} onChange={setPhoto} disabled={savingPhoto} />}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Nome do contato" value={clientDraft.name} onChange={(event) => setClientDraft({ ...clientDraft, name: event.target.value })} required />
             <Input label="Empresa" value={clientDraft.company_name} onChange={(event) => setClientDraft({ ...clientDraft, company_name: event.target.value })} required />
             <Input label="E-mail" type="email" value={clientDraft.email} onChange={(event) => setClientDraft({ ...clientDraft, email: event.target.value })} required />
-            <Input label="Telefone / WhatsApp" value={clientDraft.phone} onChange={(event) => setClientDraft({ ...clientDraft, phone: event.target.value })} />
-            <Input label="CPF / CNPJ" value={clientDraft.document} onChange={(event) => setClientDraft({ ...clientDraft, document: event.target.value })} />
+            <Input label="Telefone / WhatsApp" value={clientDraft.phone} onChange={(event) => setClientDraft({ ...clientDraft, phone: maskPhone(event.target.value) })} />
+            <label className="block text-xs font-medium">Tipo de pessoa
+              <select className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-900" value={personType}
+                onChange={(event) => { const type = event.target.value as PersonType; setPersonType(type); }}>
+                <option value="individual">Pessoa física</option>
+                <option value="company">Pessoa jurídica</option>
+              </select>
+            </label>
+            <Input label={personType === 'company' ? 'CNPJ' : 'CPF'} value={clientDraft.document} onChange={(event) => setClientDraft({ ...clientDraft, document: maskDocument(event.target.value, personType) })} />
             <Input label="Endereço" value={clientDraft.address} onChange={(event) => setClientDraft({ ...clientDraft, address: event.target.value })} />
             <label className="space-y-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
               Situação

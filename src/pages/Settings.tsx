@@ -20,7 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { dataStore } from '../services/dataStore';
 import { useNotification } from '../contexts/NotificationContext';
 import { UserAvatar } from '../components/common/UserAvatar';
-import { isSupabaseConfigured } from '../services/supabase';
+import { isSupabaseConfigured, supabase } from '../services/supabase';
 import { useTheme } from '../contexts/ThemeContext';
 
 export const Settings: React.FC = () => {
@@ -164,21 +164,42 @@ export const Settings: React.FC = () => {
     showToast(removed ? 'Logotipo removido.' : 'Não foi possível remover o logotipo.', removed ? 'info' : 'error');
   };
 
+  const [endingOtherSessions, setEndingOtherSessions] = useState(false);
+
+  const endOtherSessions = async () => {
+    if (!supabase || endingOtherSessions) return;
+    if (!window.confirm('Encerrar as outras sessões da sua conta?')) return;
+    setEndingOtherSessions(true);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'others' });
+      if (error) throw error;
+      showToast('Outras sessões encerradas. Sua sessão atual continua ativa.', 'success');
+    } catch {
+      showToast('Não foi possível encerrar as outras sessões.', 'error');
+    } finally {
+      setEndingOtherSessions(false);
+    }
+  };
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isChangingPass) return;
     if (newPass !== confirmPass) {
       showToast('A nova senha e a confirmação não coincidem.', 'warning');
       return;
     }
     setIsChangingPass(true);
-    const res = await changePassword(newPass);
-    setIsChangingPass(false);
-    if (res.success) {
-      showToast(res.message, 'success');
-      setNewPass('');
-      setConfirmPass('');
-    } else {
-      showToast(res.message, 'error');
+    try {
+      const res = await changePassword(newPass);
+      showToast(res.message, res.success ? 'success' : 'error');
+      if (res.success) {
+        setNewPass('');
+        setConfirmPass('');
+      }
+    } catch {
+      showToast('Não foi possível alterar a senha.', 'error');
+    } finally {
+      setIsChangingPass(false);
     }
   };
 
@@ -512,10 +533,16 @@ export const Settings: React.FC = () => {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400"><ShieldCheck className="h-5 w-5" /></div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">Proteção da conta</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">A autenticação e as sessões são gerenciadas pelo provedor de login conectado.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">As sessões do NEXUS AI podem ser encerradas neste painel. Se você usa o Google para entrar, gerencie a senha e a verificação em duas etapas na sua Conta Google.</p>
               </div>
             </div>
           </Card>
+
+          {supabase && <Card className="p-6 space-y-3">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Sessões da conta</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300">Use esta opção se você entrou em outro dispositivo e quer encerrar as sessões de lá.</p>
+            <Button type="button" variant="outline" size="sm" isLoading={endingOtherSessions} onClick={endOtherSessions}>Encerrar outras sessões</Button>
+          </Card>}
 
           <Card className="p-6 space-y-4">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">

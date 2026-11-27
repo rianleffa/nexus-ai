@@ -1,3 +1,4 @@
+import { formatTimeBR } from '../../utils/dates';
 import type { ChatMessage } from '../../types';
 import { supabase, isSupabaseConfigured } from '../supabase';
 
@@ -9,11 +10,13 @@ type AssistantResponse = {
   pendingConfirmation?: ChatMessage['pendingConfirmation'];
 };
 
-const timestamp = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const timestamp = () => formatTimeBR(new Date());
 
 async function invokeAssistant(body: Record<string, unknown>): Promise<AssistantResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error('Não foi possível conectar ao assistente. Tente novamente.');
-  const { data, error } = await supabase.functions.invoke('gemini', { body, signal: AbortSignal.timeout(35_000) });
+  const signal = AbortSignal.timeout(35_000);
+  const { data, error } = await supabase.functions.invoke('gemini', { body, signal });
+  if (signal.aborted) throw new Error('O assistente demorou para responder. Se você pediu uma alteração, confira os registros antes de tentar de novo.');
   if (error) {
     throw new Error('Não foi possível conectar ao assistente. Tente novamente.');
   }
@@ -36,7 +39,7 @@ export class AIService {
       : history;
     const response = await invokeAssistant({
       action: 'chat',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: 'America/Sao_Paulo',
       message: text,
       pageContext,
       history: priorHistory.slice(-12).map(({ sender, content }) => ({ sender, content })),

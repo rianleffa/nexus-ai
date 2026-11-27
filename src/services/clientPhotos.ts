@@ -23,3 +23,5 @@ export async function signClientPhoto(path: string): Promise<string | undefined>
   const { data } = await supabase?.storage.from(CLIENT_PHOTOS_BUCKET).createSignedUrl(path, 600) ?? {};
   return data?.signedUrl;
 }
+
+export const clientPhotosEnabled = import.meta.env.VITE_CLIENT_PHOTOS_ENABLED === 'true' && Boolean(supabase);
